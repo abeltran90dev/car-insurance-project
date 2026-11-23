@@ -1,0 +1,2664 @@
+
+> <ide_opened_file>The user opened the file
+  c:\Proyectos\car-insurance-project\docs\prompts\phase-0-prompt.md in the IDE.
+  This may or may not be related to the current task.</ide_opened_file>
+
+> Read docs/prompts/phase-0-prompt.md and execute it exactly as written.
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+● 2 web-fetch agents finished (ctrl+o to expand)
+   ├ Verify Strapi 5 docs facts · 22 tool uses · 213.4k tokens
+   │ ⎿  Done
+   └ Verify Angular 21 docs facts · 24 tool uses · 153.8k tokens
+     ⎿  Done
+
+› Message from web-fetch
+  Angular conventions verification, from angular.dev, read 2026-11-23. Each item
+  lists what the official page says, with the URL that confirms it. Items
+  marked "not verified" were not on the pages I read.
+
+  **Latest major on angular.dev: v22.** https://angular.dev/reference/releases
+  shows "^22.0.0 | Active | Released 2026-06-03". v21 is LTS (LTS ends 2027-06)
+  and v20 LTS ends 2026-11-28. Scheduled: v22.3 about November 2026, v23.0 about
+  June 2027. Page footers read "Built by Angular at v22.3.0". Note that claim 7
+  (OnPush default) only applies from v22.
+
+  **1. Standalone by default since v19. CORRECT.**
+  https://angular.dev/guide/components: "By default, Angular components are
+  standalone". Also: "In Angular versions before 19.0.0, the standalone option
+  defaults to false."
+
+  **2. Control flow.**
+  - `@if (x; as y) {} @else if {} @else {}`: CORRECT.
+  https://angular.dev/guide/templates/control-flow shows `@if
+  (user.profile.settings.startDate; as startDate) {`.
+  - `@for (item of items; track item.id) {} @empty {}`: syntax CORRECT,
+  including `@empty`. "Mandatory" is NOT stated. The page gives `track` as the
+  typical form and explains why it matters, but does not say it is required.
+  - `@switch/@case/@default`: CORRECT. No fallthrough, and consecutive `@case`
+  blocks stack. Also `@default never;` for exhaustiveness.
+  - `@let`: NOT verified on this page. The only reference is `@let mySignal =
+  this.mySignal()` in the @switch note. The syntax is on
+  /guide/templates/variables, which I did not fetch.
+
+  **3. Signal APIs.**
+  - `signal`, `computed`, `effect`: usage CORRECT
+  (https://angular.dev/guide/signals). The effect page (/guide/signals/effect)
+  was not fetched.
+  - `linkedSignal`: CORRECT. `linkedSignal(() => ...)`, or
+  `linkedSignal({source, computation, equal, set})`.
+  https://angular.dev/guide/signals/linked-signal
+  - `input()`, `input.required<T>()`, `model()`: CORRECT. `value = input(0)`,
+  `value = input.required<number>()`, `value = model(0)`. Input signals are
+  readonly. A model also creates a `<name>Change` output.
+  https://angular.dev/guide/components/inputs (/guide/signals/inputs redirects
+  here).
+  - `output()`: CORRECT. `panelClosed = output<void>();`, emitted with
+  `.emit()`. https://angular.dev/guide/components/outputs
+  - `viewChild()`: NOT verified. The queries page (/guide/components/queries)
+  was not fetched.
+  - **Stability:** none of the signal guide pages carry an experimental or
+  developer-preview label. The only labels I found are `resourceFromSnapshots`
+  (marked experimental) and `provideCheckNoChangesConfig` (developer preview).
+  The releases page defines the labels but does not list APIs under them. I can
+  therefore only say that no label appears on these pages, not that the APIs are
+  "stable". API reference pages would carry the status and were not fetched.
+
+  **4. resource() / httpResource().**
+  - Neither is labelled experimental on its guide page.
+  - `resource({params, loader})` also takes `stream`, `id` and `defaultValue`.
+  Shape: `value()` (signal, throws in error state), `hasValue()` (method),
+  `error()`, `isLoading()`, `status()` (signal), `reload()`, `snapshot`. Status
+  values: 'idle' | 'loading' | 'reloading' | 'resolved' | 'error' | 'local'.
+  https://angular.dev/guide/signals/resource
+  - `httpResource(() => \`/api/user/${userId()}\`)`. Import from
+  `@angular/common/http` (per the resource page). Also `httpResource.text`,
+  `.blob`, `.arrayBuffer`, and `progress()` with `reportProgress`. The page says
+  to guard `value()` reads with `hasValue()`. Do not use it for POST or PUT.
+  https://angular.dev/guide/http/http-resource
+
+  **5. Typed forms and Signal Forms.**
+  - Typed reactive forms: CORRECT. "As of Angular 14, reactive forms are
+  strictly typed by default." Examples: `new FormControl<string | null>(null)`;
+  `new FormControl('x', {nonNullable: true})`; `new FormGroup<LoginForm>({...})`
+  with optional `password?: FormControl<string>`;
+  `fb.nonNullable.group({...})`, and `NonNullableFormBuilder` is injectable by
+  that name. Untyped escape hatch: `UntypedFormGroup`, `UntypedFormControl`.
+  https://angular.dev/guide/forms/typed-forms
+  - Note: the reactive-forms page
+  (https://angular.dev/guide/forms/reactive-forms) does not cover typing and
+  uses untyped examples. Cite the typed-forms page.
+  - Signal Forms: EXISTS. Overview prerequisite: "Angular v21 or higher".
+  Import: `import {form, FormField, required, email} from
+  '@angular/forms/signals';`. `FormField` goes in the component's `imports`.
+  https://angular.dev/guide/forms/signals/overview
+  - Stability: the overview carries no experimental or developer-preview label.
+  The sidebar shows a "New" badge only. The `[field]` selector is not shown on
+  this page, so it is not verified.
+
+  **6. inject() over constructor injection. CORRECT.**
+  https://angular.dev/style-guide: "Prefer using the inject function over
+  injecting constructor parameters." Also https://angular.dev/guide/di. Extra:
+  services are declared with `@Service()`, which the DI page calls "an ergonomic
+  shorthand for @Injectable({providedIn: 'root'})".
+
+  **7. OnPush and zoneless.**
+  - OnPush: the page states "OnPush is the default change detection strategy in
+  Angular (since v22)." So an explicit `changeDetection:
+  ChangeDetectionStrategy.OnPush` is redundant on v22. The page shows no snippet
+  for the explicit form. `ChangeDetectionStrategy.Eager` still exists.
+  https://angular.dev/best-practices/skipping-subtrees
+  - Zoneless default: CORRECT for v21+. "Zoneless is the default in Angular v21+
+  so you do not need to do anything to enable it." Check that
+  `provideZoneChangeDetection` is not used. On v20, add
+  `provideZonelessChangeDetection()` to bootstrap providers. TestBed is also
+  zoneless by default. https://angular.dev/guide/zoneless
+
+  **8. Default unit test runner: Vitest. CORRECT.**
+  https://angular.dev/guide/testing: "This guide covers the default testing
+  setup for new Angular CLI projects, which uses Vitest." Builder: `"builder":
+  "@angular/build:unit-test"`. Karma is still supported
+  (https://angular.dev/guide/testing/karma). The page does not say which major
+  made Vitest the default, so "v21" is not verified.
+
+  **9. Style guide.** https://angular.dev/style-guide
+  - File naming: CORRECT. "a component named UserProfile has a file name
+  user-profile.ts". No `.component` suffix. Tests: `user-profile.spec.ts`.
+  - Folder structure by feature: CORRECT. "Avoid creating subdirectories based
+  on the type of code" (no `components/`, `services/` folders).
+  - `protected` for template-only members: CORRECT. "Prefer protected access for
+  any members that are meant to be read from the component's template."
+  - `readonly` for inputs, models, outputs and queries: CORRECT. Decorator-based
+  `@Input` properties are excluded.
+  - `class`/`style` bindings over `ngClass`/`ngStyle`: CORRECT. "Prefer class
+  and style bindings over using the NgClass and NgStyle directives."
+  - `host` object over `@HostBinding`/`@HostListener`: NOT a style rule on this
+  page. The a11y page uses a `host: {...}` block in a component example. Do not
+  cite the style guide for this.
+  - Other rules on the page: name handlers for what they do (`saveUserData()`
+  not `handleClick()`); group Angular properties before methods; use lifecycle
+  interfaces (`implements OnInit`); keep logic out of templates.
+
+  **10. Router.** https://angular.dev/guide/routing/route-guards and
+  /guide/routing/read-route-state
+  - `withComponentInputBinding()`: PARTIALLY VERIFIED. The read-route-state page
+  names it, and says matrix parameters "are also bound to component inputs when
+  using the withComponentInputBinding". The `provideRouter(routes,
+  withComponentInputBinding())` code was not on the pages read.
+  - Functional guards: CORRECT. `export const authGuard: CanActivateFn = (route:
+  ActivatedRouteSnapshot, state: RouterStateSnapshot) => {...}`, registered as
+  `canActivate: [authGuard]`. Also `CanActivateChildFn`, `CanDeactivateFn`,
+  `CanMatchFn`. Return `boolean`, `UrlTree`, `RedirectCommand`, or a
+  Promise/Observable. Guidance: return a UrlTree or RedirectCommand instead of
+  `false` plus `navigate`.
+  - `loadComponent`: NOT verified on the pages read. Next to check:
+  https://angular.dev/guide/routing/loading-strategies (not fetched).
+
+  **11. Accessibility.** https://angular.dev/best-practices/a11y
+  - Labels and ARIA: attribute bindings such as `[aria-label]="myActionLabel"`
+  and static `aria-label="Save document"`. Prefer native elements.
+  - Focus after navigation: the page says to subscribe to `NavigationEnd` and
+  focus `#main-content-header`, and to avoid focus returning to `body`.
+  - Active links: `ariaCurrentWhenActive="page"` on `routerLinkActive`.
+  - CDK: the page says the CDK "includes the `a11y` package". `LiveAnnouncer`
+  announces messages through an `aria-live` region. `cdkTrapFocus` traps Tab
+  focus. The import path `@angular/cdk/a11y` is NOT on the page. It links to
+  https://material.angular.dev/cdk/a11y/overview, which I did not fetch, so the
+  path is unverified.
+
+  **12. `provideHttpClient(withFetch())`. INCORRECT as a convention.**
+  https://angular.dev/guide/http/setup: "By default, HttpClient uses the fetch
+  API to make requests. The withXhr feature switches the client to use the
+  XMLHttpRequest API instead." No `withFetch` feature is listed. Use
+  `provideHttpClient()` for fetch, or `provideHttpClient(withXhr())` for XHR.
+  The page also says "HttpClient is available for injection by default in
+  Angular v21 and later." XHR is deprecated for SSR and slated for removal in
+  Angular 23. I did not check the API reference for `withFetch`.
+
+  **Pages read (final URLs):**
+  - https://angular.dev/guide/components
+  - https://angular.dev/guide/templates/control-flow
+  - https://angular.dev/guide/signals
+  - https://angular.dev/guide/signals/linked-signal
+  - https://angular.dev/guide/signals/resource
+  - https://angular.dev/guide/http/http-resource
+  - https://angular.dev/guide/forms/typed-forms
+  - https://angular.dev/guide/forms/signals/overview
+  - https://angular.dev/guide/forms/reactive-forms (no typed-forms content)
+  - https://angular.dev/guide/di
+  - https://angular.dev/best-practices/skipping-subtrees
+  - https://angular.dev/guide/zoneless
+  - https://angular.dev/guide/testing
+  - https://angular.dev/best-practices/a11y
+  - https://angular.dev/guide/routing/route-guards
+  - https://angular.dev/guide/routing/define-routes (no
+  withComponentInputBinding or loadComponent)
+  - https://angular.dev/guide/routing/read-route-state
+  - https://angular.dev/style-guide
+  - https://angular.dev/guide/components/inputs (redirected from
+  /guide/signals/inputs)
+  - https://angular.dev/guide/components/outputs
+  - https://angular.dev/reference/releases
+  - https://angular.dev/guide/http/setup
+
+  **Not fetched, so unverified:** `viewChild` (queries page), `@let` syntax
+  (variables page), the effect page, `loadComponent`
+  (https://angular.dev/guide/routing/loading-strategies), host elements
+  (https://angular.dev/guide/components/host-elements), the CDK import path
+  (https://material.angular.dev/cdk/a11y/overview), and API-reference stability
+  tags for the signal APIs.
+
+› Message from web-fetch
+  Strapi 5 docs verification. All pages below were fetched from docs.strapi.io.
+  Pages were not fetched through a preapproved source, so quotes are kept short
+  and mostly paraphrased.
+
+  CLAIM-BY-CLAIM
+
+  1. CORRECT. Responses are flattened: use data.title, not
+  data.attributes.title. Entries have a documentId string (24 chars), used as
+  GET /api/:pluralApiId/:documentId. The Upload and Users & Permissions plugins
+  may not follow this format.
+     URL: https://docs.strapi.io/cms/api/rest
+
+  2. CORRECT. GET /api/plans?status=draft. Values: published (default) | draft.
+  Requires Draft & Publish enabled. Without status, populated relations also
+  return published versions, and never-published related docs are omitted.
+  Nuance: REST POST/PUT also default to published. Document Service reads
+  default to draft.
+     URL: https://docs.strapi.io/cms/api/rest/status
+
+  3. CORRECT, with nuance. Syntax: GET
+  /api/:pluralApiId?filters[field][operator]=value
+     - Relation filter: deep filtering is documented, e.g.
+  filters[chef][restaurants][stars][$eq]=5. So filters[country][code][$eq]=CO is
+  valid. The relation is not returned unless you also populate it.
+     - Boolean: filters[active][$eq]=true is correct. Accepted booleans:
+  true/t/1, false/f/0 (case-insensitive). Anything else returns 400.
+     - Operators: $eq, $eqi, $ne, $nei, $lt, $lte, $gt, $gte, $in, $notIn,
+  $contains, $notContains, $containsi, $notContainsi, $null, $notNull, $between,
+  $startsWith, $startsWithi, $endsWith, $endsWithi, $or, $and, $not.
+     - Multiple fields are implicitly ANDed. Filters are usable on find
+  endpoints.
+     URL: https://docs.strapi.io/cms/api/rest/filters
+
+  4. PARTLY INCORRECT.
+     - CORRECT: relations, components, media and dynamic zones are not populated
+  by default. populate=* populates one level deep, including media, relations,
+  components and dynamic zones.
+     - UNVERIFIED: populate[options]=true is not in the populate table. The
+  documented forms are populate=options or populate[0]=options. The [x]=true
+  form appears only in a filters-page note.
+     - UNVERIFIED: populate[coverages][populate]=* is not a documented example.
+  The documented nested form is populate[root][populate][0]=nested. A wildcard
+  inside a nested populate is not shown.
+     - Combining: no restriction on combining populate with other parameters. It
+  combines with fields, filters and sort. status is root-only; status inside
+  populate returns 400. Relation fields do not support fields selection.
+     - Caveats: the docs say to avoid populate=* in production, and
+  populate=deep is not recommended. Find permission is needed on each populated
+  content type. Bracket lists are capped by arrayLimit (default 100).
+     URL: https://docs.strapi.io/cms/api/rest/populate-select (also
+  /cms/api/rest, /cms/api/rest/status#populate)
+
+  5. PARTLY INCORRECT.
+     - CORRECT: sort=order:asc (single field), sort[0]=order:asc (multiple).
+  :asc is the default and can be omitted.
+     - CORRECT: default page size is 25 for pagination[pageSize] and
+  pagination[limit].
+     - INCORRECT: "max 100" is not a Strapi default. When rest.maxLimit is unset
+  there is no maximum. New projects generate config/api with maxLimit 100.
+  maxLimit also caps pagination[pageSize].
+     - CORRECT keys in ./config/api.js (or .ts), under rest: defaultLimit
+  (default 25; -1 removes the limit) and maxLimit.
+     URL: https://docs.strapi.io/cms/api/rest/sort-pagination and
+  https://docs.strapi.io/cms/configurations/api
+
+  6. CORRECT for Public role; per-type grant is admin UI only.
+     - The Public role exists by default and cannot be deleted. Users &
+  Permissions > Roles > Public > click a category and tick actions.
+     - The page does not say find/findOne per content type in those words. The
+  REST page says find must be enabled for populated types.
+     - NOT DOCUMENTED: setting permissions programmatically in bootstrap. The
+  Users & Permissions page does not describe such an approach. Do not claim one.
+     - Also: all content types are private by default (REST page).
+     URL: https://docs.strapi.io/cms/features/users-permissions and
+  https://docs.strapi.io/cms/api/rest
+
+  7. PARTLY CORRECT.
+     - CORRECT: token types are Read-only, Full access, Custom. Durations: 7
+  days, 30 days, 90 days, Unlimited. Read-only tokens can only use find and
+  findOne. Strapi pre-generates a Full access and a Read-only token.
+     - NOT EXPLICIT: the docs do not warn against exposing tokens in front-end
+  code. The closest text is "Prefer read-only tokens for public access, scope
+  tokens to only what you need, rotate long-lived tokens, and store them in a
+  secrets manager." Do not state a front-end warning as documented. Inference,
+  not documented: a token in SPA code is visible to every visitor, so anonymous
+  public reads are better served by the Public role.
+     URL: https://docs.strapi.io/cms/features/api-tokens
+
+  8. CORRECT with caveats.
+     - create: strapi.documents('api::plan.plan').create({ data: {...}, status:
+  'published' }). Accepted params: data, locale, fields, status, populate.
+  status accepts only 'published' here, and only if Draft & Publish is enabled.
+  Without it a draft is created.
+     - publish: publish takes an object, not a bare ID:
+  strapi.documents('api::plan.plan').publish({ documentId: '...' }). Returns {
+  documentId, entries }. Requires Draft & Publish.
+     - findMany({ filters, populate, status }): correct. Params: locale, status
+  ('published' | 'draft'), publicationFilter, filters, fields, populate,
+  pagination, sort.
+     - Default status is draft for findOne, findFirst, findMany and count. For
+  public content, always pass status: 'published' explicitly.
+     - Document Service returns unsanitized data. Sanitize before returning from
+  custom controllers (strapi.contentAPI.sanitize.output).
+     URL: https://docs.strapi.io/cms/api/document-service
+
+  9. CORRECT. Location: ./src/index.js or ./src/index.ts. Signature: async
+  bootstrap({ strapi }). It runs on every server start, after Strapi setup and
+  before the server listens. register runs earlier and has no DB access. Seeding
+  must be idempotent (check, then create). Note: the docs' own seed example
+  passes pageSize: 1 at the root of findMany, but the param table defines it
+  under pagination, so use pagination: { pageSize: 1 }.
+     URL: https://docs.strapi.io/cms/configurations/functions
+
+  10. MOSTLY CORRECT.
+     - CORRECT: ./src/api/<api-name>/content-types/<name>/schema.json.
+  Components: ./src/components/<category>/<name>.json (a category subfolder is
+  required). Component attribute: "type": "component", "component":
+  "<category>.<name>", "repeatable": true.
+     - CORRECT: draftAndPublish goes under "options": { "draftAndPublish": true
+  }. Default is true, except CLI-generated types default to false. With D&P on,
+  the attribute name "status" is reserved.
+     - INCORRECT: "blocks" is not in the documented attribute types. Use
+  richtext.
+     - CORRECT list: string, text, richtext, enumeration, email, password, uid;
+  date, time, datetime, timestamp; integer, biginteger, float, decimal; boolean,
+  json; media, relation, customField, component, dynamiczone; locale and
+  localizations (i18n only).
+     - UNVERIFIED: enumeration and json syntax. Both are listed as types, but
+  the page has no examples. Only "type" is documented.
+     - Relation: "type": "relation", "relation": one of oneToOne | oneToMany |
+  manyToOne | manyToMany, "target": "api::x.x" (or a bare name in some
+  examples), plus inversedBy or mappedBy. An inverse side without an owner fails
+  at boot.
+     - CAVEAT: unique is not checked on draft saves when D&P is on. Duplicates
+  (for example, country codes) only fail at publish. The docs suggest disabling
+  D&P for globally unique types.
+     URL: https://docs.strapi.io/cms/backend-customization/models
+
+  11. PARTLY CORRECT.
+     - The docs do not state that i18n is built in or needs no install. The page
+  lists the feature as "Available but disabled by default" (plan: Free). Enable
+  it through Settings > Global Settings > Internationalization, then per
+  content type in the Content-type Builder. Note: one docs page calls it "the
+  Internationalization (i18n) plugin".
+     - REST locale param: GET /api/restaurants?locale=fr. GET
+  /api/restaurants/:documentId?locale=fr. POST /api/restaurants?locale=fr
+  creates that locale. PUT /api/restaurants/:documentId?locale=fr creates or
+  updates that locale. DELETE .../:documentId?locale=fr deletes only that
+  locale.
+     - Omitted locale = the default locale (en for new projects, configurable in
+  admin). Creating a localization via PUT requires the createLocalization
+  permission, else 403.
+     URL: https://docs.strapi.io/cms/features/internationalization and
+  https://docs.strapi.io/cms/api/rest/locale
+
+  12. CORRECT. In ./config/middlewares.js (or .ts), the array includes
+  'strapi::cors' by default. Override it with { name: 'strapi::cors', config: {
+  origin: [...] } }. origin accepts a string, array, or function. Default is
+  '*'. Other options: maxAge, credentials (default true), methods, headers,
+  expose, keepHeadersOnError. Array order matters.
+      URL: https://docs.strapi.io/cms/configurations/middlewares
+
+  13. PARTLY VERIFIED.
+     - import: yarn strapi import -f <file> (or npm run strapi import -- -f
+  <file>). Options: -k/--key (encrypted), --force (skips the delete prompt),
+  --exclude, --only, --exclude-content-types / --only-content-types (5.51.0+),
+  import from directory (5.42.0+).
+     - import caveats: it deletes ALL existing data (database and uploads)
+  first. Source and target schemas must match. Admin users are not restored, so
+  createdBy/updatedBy are empty. With cloud storage, media may be deleted from
+  the provider.
+     - export: yarn strapi export. Default output is an encrypted, gzipped
+  .tar.gz.enc (aes-128-ecb). Options: --no-encrypt, --no-compress, -f/--file,
+  -k/--key, --only content|files|config, --exclude (e.g. files,content),
+  --format dir (5.42.0+). Caveat: admin users and API tokens are NOT exported.
+     - transfer: NOT VERIFIED. The transfer page was not fetched. Overview
+  facts: it needs a transfer token (Push, Pull or Full Access) and
+  transfer.token.salt set in config/admin (or TRANSFER_TOKEN_SALT). Without the
+  salt the feature is disabled. Tokens are shown only once.
+     URLs: https://docs.strapi.io/cms/data-management/import (the page is
+  canonically at /cms/features/data-management/import per the site's own links),
+  https://docs.strapi.io/cms/features/data-management/export,
+  https://docs.strapi.io/cms/features/data-management
+
+  14. PARTLY INCORRECT.
+     - No minimum Node version is stated. Only Active or Maintenance LTS
+  releases are supported, currently v22, v24 and v26. Odd-numbered non-LTS
+  releases (v23, v25) are not supported. npm v6+ or pnpm.
+     - Default database: SQLite (CLI --dbclient default; DATABASE_CLIENT=sqlite;
+  DATABASE_FILENAME default .tmp/data.db). Supported: SQLite 3, MySQL 8.0+,
+  MariaDB 10.3+, PostgreSQL 14.0+. MongoDB is not supported.
+     - Env vars in the documented table: APP_KEYS (auto-generated),
+  API_TOKEN_SALT (auto), ADMIN_JWT_SECRET (required when the admin panel is
+  served), JWT_SECRET (Users & Permissions, auto), TRANSFER_TOKEN_SALT (auto),
+  DATABASE_CLIENT, DATABASE_FILENAME, HOST, PORT.
+     - ENCRYPTION_KEY is NOT in that table. It appears only in the generated
+  .env example and as env('ENCRYPTION_KEY') in config/admin
+  secrets.encryptionKey (used to make API tokens viewable later).
+     URLs: https://docs.strapi.io/cms/installation/cli,
+  https://docs.strapi.io/cms/configurations/environment,
+  https://docs.strapi.io/cms/features/api-tokens
+
+  15. CONFIRMED ON THE PAGE. The release-notes page says "The latest Strapi CMS
+  version is 5.62.0". Do not confuse this with the docs-site version (7.8.0)
+  shown on the same page.
+      URL: https://docs.strapi.io/release-notes
+
+  CORRECTIONS TO FLAG
+  - "max 100" is not a default. It is only the value new projects generate.
+  - No "minimum Node version" exists. Use the supported LTS list.
+  - "blocks" is not a schema attribute type. Use richtext.
+  - No documented warning against exposing API tokens in front-end code.
+  - Setting permissions programmatically in bootstrap is not documented.
+  - i18n is not explicitly documented as built in with no install.
+  - populate[options]=true and populate[x][populate]=* are not documented forms.
+  Use populate=x or populate[0]=x.
+  - ENCRYPTION_KEY is not in the official env var table.
+  - Enumeration and json syntax have no documented examples.
+
+  NOT VERIFIED (not fetched): the strapi transfer command syntax, and the
+  Document Service status and publication-filter subpages. Their parameters were
+  taken from the main Document Service page.
+
+  URLS READ
+  https://docs.strapi.io/cms/api/rest
+  https://docs.strapi.io/cms/api/rest/filters
+  https://docs.strapi.io/cms/api/rest/populate-select
+  https://docs.strapi.io/cms/api/rest/sort-pagination
+  https://docs.strapi.io/cms/api/rest/status
+  https://docs.strapi.io/cms/api/rest/locale
+  https://docs.strapi.io/cms/features/draft-and-publish
+  https://docs.strapi.io/cms/api/document-service
+  https://docs.strapi.io/cms/features/users-permissions
+  https://docs.strapi.io/cms/features/api-tokens
+  https://docs.strapi.io/cms/configurations/middlewares
+  https://docs.strapi.io/cms/backend-customization/models
+  https://docs.strapi.io/cms/configurations/functions
+  https://docs.strapi.io/cms/features/internationalization
+  https://docs.strapi.io/cms/data-management/import
+  https://docs.strapi.io/cms/features/data-management
+  https://docs.strapi.io/cms/features/data-management/export
+  https://docs.strapi.io/cms/installation/cli
+  https://docs.strapi.io/cms/configurations/environment
+  https://docs.strapi.io/cms/configurations/api
+  https://docs.strapi.io/release-notes
+
+● Both verification reports are back (Strapi 5.62 docs, angular.dev at v22.3).
+  Writing the files now.
+
+● Bash(mkdir -p .claude/agents .claude/skills/spec-authoring
+      .claude/skills/strapi5-content-modeling .claude/skills/angular-conventions
+      docs/user-stories docs/specs do…)
+  ⎿  Created cms\.gitkeep
+  ⎿  Created docs\ai-sessions\.gitkeep
+  ⎿  Created docs\specs\.gitkeep
+  ⎿  Created frontend\.gitkeep
+
+● Write(docs\user-stories\US-01.md)
+  ⎿  Wrote 43 lines to docs\user-stories\US-01.md
+      1 # US-01 – Policyholder and vehicle data form
+      2
+      3 > Source: `docs/assessment/Technical assessment -Frontend.pdf`, "
+        Functional user stories" (pages 5–6). Copied verbatim. Do not edi
+        t; gaps and interpretations go in `docs/specs/SPEC-US-01.md`.
+      4
+      5 ## Story
+      6
+      7 As a person interested in insuring my car, I want to enter my dat
+        a and my vehicle's data in a simple form, so that I receive insur
+     … +37 lines (~2 KB) (ctrl+o to expand)
+
+● Write(docs\user-stories\US-02.md)
+  ⎿  Wrote 44 lines to docs\user-stories\US-02.md
+      1 # US-02 – Plan list
+      2
+      3 > Source: `docs/assessment/Technical assessment -Frontend.pdf`, "
+        Functional user stories" (pages 6–7). Copied verbatim. Do not edi
+        t; gaps and interpretations go in `docs/specs/SPEC-US-02.md`.
+      4
+      5 ## Story
+      6
+      7 As a person getting a quote, I want to see the plans available fo
+        r my country with their price and coverages, so that I can choose
+     … +38 lines (~1 KB) (ctrl+o to expand)
+
+● Write(docs\user-stories\US-03.md)
+  ⎿  Wrote 47 lines to docs\user-stories\US-03.md
+      1 # US-03 – Summary and payment
+      2
+      3 > Source: `docs/assessment/Technical assessment -Frontend.pdf`, "
+        Functional user stories" (pages 8–9). Copied verbatim. Do not edi
+        t; gaps and interpretations go in `docs/specs/SPEC-US-03.md`.
+      4
+      5 ## Story
+      6
+      7 As a person who chose a plan, I want to review a summary of my qu
+        ote and pay, so that I become insured.
+     … +40 lines (ctrl+o to expand)
+
+● Bash(cd /c/Proyectos/car-insurance-project/docs/user-stories && sed -i
+      "s/vehicle's/vehicle’s/g; s/country's/country’s/g;
+      s/policyholder's/policyholder’s/g; s/\"reco…)
+  ⎿  Updated docs\user-stories\US-01.md +1 -1
+       4 
+       5  ## Story
+       6 
+       7 -As a person interested in insuring my car, I want to enter my d
+         -ata and my vehicle's data in a simple form, so that I receive i
+         -nsurance options suited to my country and my vehicle.          
+       7 +As a person interested in insuring my car, I want to enter my d
+         +ata and my vehicle’s data in a simple form, so that I receive i
+         +nsurance options suited to my country and my vehicle.          
+       8 
+       9  ## Context
+      10 
+  ⎿  Updated docs\user-stories\US-02.md +2 -2
+       8 
+       9  ## Context
+      10 
+      11 -Plans, coverages, benefits and prices change by country and are
+         - managed by the business team from Strapi. The business team wa
+         -nts to highlight one plan as "recommended" and control the orde
+         -r in which plans appear.                                       
+      11 +Plans, coverages, benefits and prices change by country and are
+         + managed by the business team from Strapi. The business team wa
+         +nts to highlight one plan as “recommended” and control the orde
+         +r in which plans appear.                                       
+      12 
+      13  ## Business rules
+      14 
+      15  - Each plan is configured in Strapi with: name, short descripti
+          on, base price, currency, coverages, benefits, order, recommend
+          ed flag, active status and country.
+      16  - Only published and active plans for the country are shown.
+      17 -- The price is shown in the country's currency and format (Colo
+         -mbian pesos or Chilean pesos).                                 
+      17 +- The price is shown in the country’s currency and format (Colo
+         +mbian pesos or Chilean pesos).                                 
+      18  - The final price may be adjusted by a simulated rule based on
+          the step 1 data. The rule is documented.
+      19  - Only one plan can be selected.
+      20 
+  ⎿  Updated docs\user-stories\US-03.md +2 -2
+      12 
+      13  ## Business rules
+      14 
+      15 -- The summary shows the policyholder's data, the vehicle's data
+         - and the chosen plan with its final price.                     
+      15 +- The summary shows the policyholder’s data, the vehicle’s data
+         + and the chosen plan with its final price.                     
+      16  - The document number is shown partially masked.
+      17  - From the summary the person can go back to edit their data or
+           change the plan.
+      18  - The pay button is enabled only after accepting the terms and
+          conditions.
+     ...
+      25  Scenario: Complete summary
+      26    Given I chose a plan
+      27    When I reach the summary
+      28 -  Then I see my data, my vehicle's data and the chosen plan wit
+         -h its final price                                              
+      28 +  Then I see my data, my vehicle’s data and the chosen plan wit
+         +h its final price                                              
+      29 
+      30  Scenario: Terms by country
+      31    Given I am on the summary
+
+● Now the global context file.
+
+● Write(CLAUDE.md)
+  ⎿  Wrote 108 lines to CLAUDE.md
+      1 # CLAUDE.md — global context (applies to every agent and session)
+      2
+      3 ## Project
+      4
+      5 A multi-country (Colombia `CO`, Chile `CL`) car insurance quoting
+         wizard: data form → plan list → summary and simulated payment. O
+        ne Angular frontend; all form fields, plans and copy come from St
+        rapi per country. The grade weighs the agentic flow (65%) over th
+        e app (35%), so the process artifacts matter as much as the code.
+      6
+     … +102 lines (ctrl+o to expand)
+
+● Now the five subagents.
+
+● Write(.claude\agents\spec-writer.md)
+  ⎿  Wrote 51 lines to .claude\agents\spec-writer.md
+       1 ---
+       2 name: spec-writer
+       3 description: Turns one user story (docs/user-stories/US-XX.md) i
+         nto a verifiable spec at docs/specs/SPEC-US-XX.md. Detects gaps
+         and ambiguities and proposes resolutions. Use at the start of ev
+         ery story, and again when the human rejects a spec at HC1 (pass
+         the rejection reason).
+       4 tools: Read, Grep, Glob, Write
+       5 model: opus
+       6 ---
+     … +45 lines (ctrl+o to expand)
+
+● Write(.claude\agents\architect.md)
+  ⎿  Wrote 46 lines to .claude\agents\architect.md
+       1 ---
+       2 name: architect
+       3 description: Identifies architecture decisions that the approved
+          specs require and writes ADRs (MADR format) with real alternati
+         ves and consequences at docs/adr/ADR-NNN-<slug>.md. Use after sp
+         ecs are approved at HC1, and again when the human rejects an ADR
+          at HC2 (pass the reason).
+       4 tools: Read, Grep, Glob, Write, WebFetch
+       5 model: opus
+       6 ---
+     … +40 lines (ctrl+o to expand)
+
+● Write(.claude\agents\implementer.md)
+  ⎿  Wrote 51 lines to .claude\agents\implementer.md
+       1 ---
+       2 name: implementer
+       3 description: Implements one approved spec (docs/specs/SPEC-US-XX
+         .md) in Angular (frontend/) and Strapi (cms/) following CLAUDE.m
+         d, the accepted ADRs and the project skills, with atomic Convent
+         ional Commits. Also applies the review findings the human select
+         ed at HC3. Refuses if the spec is not Approved.
+       4 tools: Read, Write, Edit, Grep, Glob, Bash
+       5 model: sonnet
+       6 ---
+     … +45 lines (ctrl+o to expand)
+
+● Write(.claude\agents\test-writer.md)
+  ⎿  Wrote 46 lines to .claude\agents\test-writer.md
+       1 ---
+       2 name: test-writer
+       3 description: Writes unit tests (Vitest via Angular CLI) and Play
+         wright e2e tests mapped 1:1 to the spec's acceptance criteria, r
+         uns them and reports results. Must NOT change production code; r
+         eports bugs instead. Use after implementer finishes a story or a
+          fix round.
+       4 tools: Read, Write, Edit, Grep, Glob, Bash
+       5 model: sonnet
+       6 ---
+     … +40 lines (ctrl+o to expand)
+
+● Write(.claude\agents\reviewer.md)
+  ⎿  Wrote 48 lines to .claude\agents\reviewer.md
+       1 ---
+       2 name: reviewer
+       3 description: Reviews a story's changes against its spec, accepte
+         d ADRs, CLAUDE.md, security and accessibility. Read-only; cannot
+          edit or run anything. Returns a review report in the docs/revie
+         ws/0000-template.md format, which the main session saves as docs
+         /reviews/REVIEW-US-XX.md. Use after test-writer finishes.
+       4 tools: Read, Grep, Glob
+       5 model: opus
+       6 ---
+     … +42 lines (ctrl+o to expand)
+
+● Now the three skills, starting with spec-authoring.
+
+● Write(.claude\skills\spec-authoring\SKILL.md)
+  ⎿  Wrote 184 lines to .claude\skills\spec-authoring\SKILL.md
+       1 ---
+       2 name: spec-authoring
+       3 description: Template and gap-detection checklist for writing a
+         verifiable spec (docs/specs/SPEC-US-XX.md) from a user story in
+         this project. Use whenever creating or revising a spec, or when
+         reviewing whether a spec is ready for HC1 approval.
+       4 ---
+       5
+       6 # Spec authoring
+       7
+     … +177 lines (ctrl+o to expand)
+
+● Now the Strapi skill, built only from what the docs check confirmed. Anything
+  the docs didn't confirm is labelled as unverified.
+
+● Write(.claude\skills\strapi5-content-modeling\SKILL.md)
+  ⎿  Wrote 128 lines to .claude\skills\strapi5-content-modeling\SKILL.md
+      1 ---
+      2 name: strapi5-content-modeling
+      3 description: How this project models and serves content in Strapi
+         5 (cms/): collection types vs components, draft & publish, filte
+        ring by country, REST query syntax, idempotent seeding for CO and
+         CL, minimal Public role permissions, and token/CORS security. Us
+        e for any work in cms/, any Strapi data contract in a spec, ADRs
+        about content, and any frontend code that calls Strapi.
+      4 ---
+      5
+     … +123 lines (ctrl+o to expand)
+
+● Last skill: Angular conventions.
+● Write(.claude\skills\angular-conventions\SKILL.md)
+  ⎿  Wrote 104 lines to .claude\skills\angular-conventions\SKILL.md
+      1 ---
+      2 name: angular-conventions
+      3 description: Angular 21+ conventions for frontend/ in this projec
+        t: standalone components, signals for state, built-in control flo
+        w, typed reactive forms built from Strapi config, inject(), OnPus
+        h, feature folders, the loading/error pattern, testing setup and
+        the accessibility checklist for the wizard. Use for any code or r
+        eview work in frontend/.
+      4 ---
+      5
+     … +99 lines (ctrl+o to expand)
+
+● Templates, README and FLOW.md.
+
+● Write(docs\adr\0000-template.md)
+  ⎿  Wrote 69 lines to docs\adr\0000-template.md
+       1 ---
+       2 id: ADR-NNN
+       3 title: <short decision title, phrased as the problem solved>
+       4 status: Proposed          # Proposed | Accepted | Superseded
+       5 date: YYYY-MM-DD
+       6 deciders: <human approver>, architect (Claude Code subagent)
+       7 related_specs: [SPEC-US-XX]
+       8 supersedes:               # ADR-NNN, if any
+       9 superseded_by:            # ADR-NNN, if any
+      10 ---
+     … +59 lines (ctrl+o to expand)
+
+● Write(docs\reviews\0000-template.md)
+  ⎿  Wrote 36 lines to docs\reviews\0000-template.md
+       1 # REVIEW-US-XX – <story title>
+       2
+       3 | Field | Value |
+       4 |-------|-------|
+       5 | Story | [US-XX](../user-stories/US-XX.md) |
+       6 | Spec | [SPEC-US-XX](../specs/SPEC-US-XX.md) (version N) |
+       7 | ADRs checked | ADR-NNN, … |
+       8 | Branch | `feat/US-XX-<slug>` |
+       9 | Commit range | `<base-sha>..<head-sha>` |
+      10 | Test summary reviewed | unit: N passed / N failed · e2e: N pas
+     … +27 lines (~1 KB) (ctrl+o to expand)
+
+● Write(README.md)
+  ⎿  Wrote 41 lines to README.md
+      1 # Multi-country car insurance quote (CO / CL)
+      2
+      3 > Skeleton. Completed as the project is built.
+      4
+      5 A single Angular application that quotes car insurance for Colomb
+        ia and Chile in a 3-step wizard (data form → plan list → summary
+        and simulated payment). Every form field, plan and piece of copy
+        is configured per country in Strapi 5.
+      6
+      7 Built with an AI-driven, spec-driven flow. See [FLOW.md](FLOW.md)
+     … +35 lines (~1 KB) (ctrl+o to expand)
+
+● Write(FLOW.md)
+  ⎿  Wrote 88 lines to FLOW.md
+       1 # FLOW.md – Agentic development flow
+       2
+       3 > Skeleton. Steps are filled in as they are defined and used; TO
+         DO sections are completed at the end of the project.
+       4
+       5 How a functional user story becomes a QA-ready increment in this
+          repo: a spec-driven flow run in **Claude Code**, with five suba
+         gents, three custom skills, a global context file and four human
+          checkpoints.
+       6
+     … +82 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Phase 0 is set up and I've stopped for your review. Nothing is committed and
+  nothing is installed or scaffolded.
+
+  I read the PDF and created everything the prompt asks for. The three stories
+  are copied verbatim, including the PDF's curly quotes. The only change is that
+  Gherkin lines the PDF wrapped are joined back into one line. I checked the
+  Strapi 5 docs (docs.strapi.io, latest release 5.62.0) and angular.dev
+  (currently v22.3; v21 is the long-term-support version). Each skill cites the
+  pages it relies on, and anything the official docs didn't confirm is marked
+  [unverified] rather than stated from memory.
+
+  1. File tree
+
+  CLAUDE.md · README.md · FLOW.md
+  .claude/agents/   spec-writer.md · architect.md · implementer.md ·
+  test-writer.md · reviewer.md
+  .claude/skills/   spec-authoring/SKILL.md · strapi5-content-modeling/SKILL.md
+  · angular-conventions/SKILL.md
+  docs/user-stories/  US-01.md · US-02.md · US-03.md
+  docs/specs/.gitkeep · docs/ai-sessions/.gitkeep
+  docs/adr/0000-template.md · docs/reviews/0000-template.md
+  frontend/.gitkeep · cms/.gitkeep
+
+  2. Agents and skills
+
+  Agents. Each file records the reasoning behind its split, its tools and its
+  model.
+  - spec-writer (opus; Read/Grep/Glob/Write): writes SPEC-US-XX.md with status:
+    Draft and is never allowed to approve it. It turns story gaps into numbered
+    GAP-NN items. It lists open questions and decisions that need an ADR
+    separately.
+  - architect (opus; plus WebFetch): writes ADR-NNN-*.md as Proposed, with at
+    least three real alternatives. It checks framework facts against official
+    docs and never edits an existing ADR; changes go in a new one.
+  - implementer (sonnet): first checks the spec status. It replies REFUSED if
+    the spec isn't Approved or an ADR it depends on isn't Accepted. It works on
+    a branch per story with atomic commits and does fix runs per finding ID.
+  - test-writer (sonnet): writes tests from the acceptance criteria, named with
+    their AC IDs. It may only touch test files. When a test exposes a bug it
+    keeps the test and reports the bug instead of weakening the test.
+  - reviewer (opus; Read/Grep/Glob only): gets the diff and test summary in its
+    prompt and returns a report that the main session saves. It never fills in
+    the human-decision or resolution-commit columns.
+
+  Skills:
+  - spec-authoring: the full spec template and a gap checklist covering the 8
+    categories you listed, plus a "Ready for HC1" self-check.
+  - strapi5-content-modeling:
+    - A starting content model: country, form-field and plan collection types,
+      with options, validation rules, coverages and benefits as components.
+      ADR-001 has the final say.
+    - A REST query cheat sheet and idempotent seeding at startup.
+    - The minimal Public role, no tokens in the frontend, and restricted CORS.
+    - Docs facts that matter: the Document Service reads drafts by default,
+      unlike the REST API. unique isn't enforced on drafts. There is no blocks
+      attribute type. Don't use populate=* in app code.
+  - angular-conventions:
+    - Standalone components, inject(), signals, built-in control flow, explicit
+      OnPush (the default only from v22).
+    - Data loading with httpResource, using four states: loading, error, empty
+      and data.
+    - Typed reactive forms generated from Strapi, with named validators.
+    - Feature folders without file-type suffixes, Vitest for unit tests, and the
+      a11y checklist.
+
+  3. Decisions of yours I think are weak or risky (not changed)
+
+  1. Approval is enforced only by agent instructions. The Approved status and
+     the implementer's refusal are prompt rules, and nothing technical stops a
+     slip. A small Claude Code hook that blocks edits in frontend/ or cms/ when
+     the spec isn't Approved would make the gate real.
+  2. Writing all specs first, with no path back. Implementing US-01 will
+     probably invalidate parts of SPEC-US-02 and SPEC-US-03. The flow has no
+     "spec change → new version → HC1 again" loop. I suggest adding one.
+  3. Bugs found by test-writer have no defined route. They show up in the test
+     summary, but nothing makes them review findings. I suggest the reviewer
+     must log each one as a finding so it goes through HC3.
+  4. docker compose up conflicts with the Public role permissions. The docs only
+     show setting permissions by hand in the admin panel. Setting them
+     automatically at startup relies on undocumented internal Strapi APIs. Doing
+     that should be an ADR with a test that a write returns 403.
+  5. Session logs may be incomplete. I'm not sure /export of the main session
+     includes what happens inside subagents. If it doesn't, the "unedited logs"
+     deliverable has holes. This is worth checking after the first subagent run.
+  6. Minor: the reviewer can't run git diff, so the main session must pass the
+     full diff, and a large one could be cut off. Pointing the reviewer at the
+     changed file list, which it reads itself, would be more robust.
+
+  4. Open questions
+
+  1. Angular 21 or 22? v22 is current, and v21 is the long-term-support release.
+     The conventions work on both.
+  2. Strapi permissions: set them automatically at startup (undocumented
+     internals, decided via ADR) or by hand in the admin panel, which breaks the
+     one-command setup?
+  3. Approved by: what name should go in approved_by in spec front matter and
+     ADR deciders?
+  4. Phase 0 commit: go straight to main as your prompt implies, or to a
+     chore/flow-setup branch?
+
+  A few things weren't in your prompt and I added them; tell me if you'd rather
+  drop them:
+  - The Definition of Done items.
+  - A four-level severity scale for review findings.
+  - A naming pattern for session logs: YYYY-MM-DD-<phase>.txt.
+  - A SEED_ON_BOOT switch for seeding.
+  - A planned route shape /:country/datos, which ADR-001 will decide.
+
+  Waiting for your APPROVED or REJECTED: <reason>.
+
+> <ide_opened_file>The user opened the file
+  c:\Proyectos\car-insurance-project\.claude\agents\implementer.md in the IDE.
+  This may or may not be related to the current task.</ide_opened_file>
+
+> REJECTED: good work, apply these changes before I approve.
+
+  1. Spec gate as a real control: add a PreToolUse hook in
+  .claude/settings.json that runs a Node script (.claude/hooks/spec-gate.mjs,
+  I'm on Windows). It blocks Write/Edit under frontend/ or cms/ unless: (a) the
+  branch is feat/US-XX-* and docs/specs/SPEC-US-XX.md has status: Approved, or
+  (b) the branch is chore/scaffold-* (infrastructure only, no feature code).
+  Block on main. Document it in CLAUDE.md and FLOW.md.
+  2. Spec change loop: specs get a version field and a changelog. Any change
+  after approval bumps the version, sets status back to Draft and goes through
+  HC1 again. Update spec-writer, the spec-authoring skill, CLAUDE.md and the
+  FLOW diagram.
+  3. Bugs reported by test-writer: the reviewer must log each one as a finding
+  so it goes through HC3.
+  4. Strapi permissions: they will be set automatically in Strapi's bootstrap
+  so docker compose up stays one command. The architect will record this in an
+  ADR, and there must be a test proving a public write returns 403. Note this
+  in the strapi5 skill.
+  5. Logs: besides /export, copy the raw session transcripts from
+  ~/.claude/projects into docs/ai-sessions/raw/. Add the procedure to
+  CLAUDE.md. We will verify subagent coverage after the first subagent run.
+  6. Reviewer input: the main session writes the changed-file list and the diff
+  to docs/reviews/US-XX.diff and the reviewer reads it from there.
+
+  Answers: Angular 21 (LTS). Permissions automated (point 4). approved_by /
+  deciders: Andres Beltran. Commit Phase 0 directly to main.
+  Keep all your additions.
+
+  Show me a summary of the changes and wait for my APPROVED.
+
+● Applying the six changes. First I'll check where the raw transcripts actually
+  live so the procedure is correct.
+
+  Ran 1 shell command (ctrl+o to expand)
+  ⎿  3 skills available
+
+● Subagent transcripts are saved under <session-id>/subagents/, so they can be
+  copied along. I'm now checking the raw transcripts for personal data before
+  they go into the repo. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The raw transcript contains your email address 3 times (Claude Code adds it as
+  session context). I'll flag this in the summary rather than decide for you.
+  Now the hook:
+
+● Write(.claude\hooks\spec-gate.mjs)
+  ⎿  Wrote 99 lines to .claude\hooks\spec-gate.mjs
+       1 #!/usr/bin/env node
+       2 // Spec gate (PreToolUse hook for Write|Edit|NotebookEdit).
+       3 //
+       4 // Blocks writes under frontend/ or cms/ unless:
+       5 //   (a) the current branch is feat/US-XX-* and docs/specs/SPEC-
+         US-XX.md has
+       6 //       front matter `status: Approved`, or
+       7 //   (b) the current branch is chore/scaffold-* (infrastructure
+         only: writes to
+       8 //       feature code under frontend/src/app/features/ are still
+     … +92 lines (~3 KB) (ctrl+o to expand)
+
+● Write(.claude\settings.json)
+  ⎿  Wrote 16 lines to .claude\settings.json
+       1 {
+       2   "hooks": {
+       3     "PreToolUse": [
+       4       {
+       5         "matcher": "Write|Edit|NotebookEdit",
+       6         "hooks": [
+       7           {
+       8             "type": "command",
+       9             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks
+         /spec-gate.mjs\"",
+     … +7 lines (ctrl+o to expand)
+
+● Now testing the gate against every case in a throwaway repo in the scratchpad.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● All 13 cases behave as intended. Now a live check that Claude Code actually
+  fires the hook. I'm on main, so this write should be blocked:
+
+● Write(frontend\gate-probe.txt)
+  ⎿  Error: PreToolUse:Write hook error: [node
+     "$CLAUDE_PROJECT_DIR/.claude/hooks/spec-gate.mjs"]: SPEC GATE: writes to
+     frontend/gate-probe.txt are not allowed on main. Use feat/US-XX-<slug>
+     (approved spec) or chore/scaffold-<slug>.
+     See CLAUDE.md > "Status gates".
+
+● The hook blocks for real. Now updating CLAUDE.md.
+
+● Update(CLAUDE.md)
+  ⎿  Added 1 line, removed 1 line
+      12 
+      13  | Layer | Tech |
+      14  |-------|------|
+      15 -| Frontend | Angular 21+ (`frontend/`) |                       
+      15 +| Frontend | Angular 21 LTS (`frontend/`) |                    
+      16  | Content backend | Strapi 5+ (`cms/`) |
+      17  | Environment | Docker Compose: `docker compose up` starts ever
+          ything, with seed data for CO and CL |
+      18  | Unit tests | Angular CLI default runner (Vitest) |
+
+● Update(CLAUDE.md)
+  ⎿  Added 1 line, removed 1 line
+      26  1. **One build serves CO and CL.** No per-country builds, envir
+          onment files or code branches keyed on hard-coded country conte
+          nt.
+      27  2. **Form fields and plans are 100% from Strapi.** No hard-code
+          d field lists, labels, options, validation messages, plans or p
+          rices in the frontend.
+      28  3. **No NgModules.** Standalone components, signals, built-in c
+          ontrol flow.
+      29 -4. **No Strapi token with write permissions in the frontend.** 
+         -Public content is read through the Public role with `find`/`fin
+         -dOne` only.                                                    
+      29 +4. **No Strapi token with write permissions in the frontend.** 
+         +Public content is read through the Public role with `find`/`fin
+         +dOne` only. Those permissions are set automatically in Strapi's
+         + `bootstrap` (decision recorded in an ADR), and a test proves t
+         +hat a public write returns 403.                                
+      30  5. **Fictitious data only.** No real personal data, documents,
+          plates or credentials anywhere in the repo, including seeds and
+           tests.
+      31  6. **No real payment gateway and no card data.** Price calculat
+          ion and payment are simulated.
+      32  7. Secrets live in `.env` (gitignored). Only `.env.example` wit
+          h placeholder values is committed.
+
+● Update(CLAUDE.md)
+  ⎿  Added 5 lines, removed 1 line
+      44            → [implementer] → [test-writer] → [reviewer]
+      45            → HC3 human triages findings → [implementer] fixes →
+          re-run tests
+      46            → HC4 human sign-off: ready for QA
+      47 +                                                               
+      48 +Spec change loop (any time after HC1):                         
+      49 +  change needed → [spec-writer] bumps version, status: Draft, c
+         +hangelog entry → HC1 again                                     
+      50 +               → (spec gate blocks code for that story until re
+         +-approved)                                                     
+      51  ```
+      52 
+      49 -Order of work: first all specs (US-01..03) and ADRs, then imple
+         -mentation US-01 → US-02 → US-03. The multi-country decision aff
+         -ects every screen and is taken once, up front.                 
+      53 +Order of work: first all specs (US-01..03) and ADRs, then imple
+         +mentation US-01 → US-02 → US-03. The multi-country decision aff
+         +ects every screen and is taken once, up front. Because specs ar
+         +e written up front, implementation will expose changes to later
+         + specs. Those go through the spec change loop, never straight i
+         +nto code.                                                      
+      54 
+      55  Subagent definitions: `.claude/agents/`. The main session orche
+          strates. It delegates to subagents and does not write specs, AD
+          Rs, production code or reviews itself.
+      56 
+
+● Update(CLAUDE.md)
+  ⎿  Added 2 lines
+      56 
+      57  ## Human checkpoints (HC)
+      58 
+      59 +The human approver is **Andres Beltran** (use this name in `app
+         +roved_by` and ADR `deciders`).                                 
+      60 +                                                               
+      61  At every checkpoint the main session **stops**, summarizes what
+           to review (paths and key points), and waits for an explicit `A
+          PPROVED` or `REJECTED: <reason>`. On rejection it re-runs the r
+          esponsible subagent with the reason as input. **Nothing advance
+          s without `APPROVED`.** Silence, "looks good" or a question is
+          not approval: ask again.
+      62 
+      63  | HC | Human reviews | Approval criteria | On rejection |
+
+● Update(CLAUDE.md)  ⎿  Added 16 lines, removed 1 line
+      71 
+      72  ## Status gates
+      73 
+      74 -- Specs: front matter `status: Draft | Approved`, `approved_by`
+         -, `approved_on`. Only the human approves. The main session writ
+         -es `Approved` only after receiving `APPROVED` at HC1.          
+      74 +- Specs: front matter `status: Draft | Approved`, `version`, `a
+         +pproved_by`, `approved_on`, plus a **Changelog** table at the e
+         +nd. Only the human approves. The main session writes `Approved`
+         + only after receiving `APPROVED` at HC1.                       
+      75 +- **Spec versioning:** any change to an `Approved` spec (wordin
+         +g, AC, contract, anything) bumps `version`, sets `status: Draft
+         +`, clears `approved_by`/`approved_on`, and adds a Changelog row
+         + (version, date, change, reason, ACs affected). It then goes th
+         +rough HC1 again. Only spec-writer edits specs; on re-approval t
+         +he main session fills the approval fields and records the appro
+         +val in the Changelog row.                                      
+      76  - ADRs: `status: Proposed | Accepted | Superseded`. The main se
+          ssion sets `Accepted` only after `APPROVED` at HC2.
+      77  - **The implementer must refuse to implement a story whose spec
+           is not `status: Approved`**, or that depends on an ADR that is
+           still `Proposed`.
+      78 
+      79 +### Spec gate hook (enforced, not just instructed)             
+      80 +                                                               
+      81 +`.claude/settings.json` registers a `PreToolUse` hook on `Write
+         +|Edit|NotebookEdit` that runs `.claude/hooks/spec-gate.mjs` (No
+         +de). It blocks any write under `frontend/` or `cms/` unless:   
+      82 +                                                               
+      83 +| Branch | Rule |                                              
+      84 +|--------|------|                                              
+      85 +| `feat/US-XX-<slug>` | Allowed only if `docs/specs/SPEC-US-XX.
+         +md` has `status: Approved` |                                   
+      86 +| `chore/scaffold-<slug>` | Infrastructure only (project scaffo
+         +lding, config, Docker). Writes under `frontend/src/app/features
+         +/` are blocked |                                               
+      87 +| `main`, detached HEAD, any other branch | Blocked |          
+      88 +                                                               
+      89 +Writes outside `frontend/` and `cms/` (docs, specs, ADRs, revie
+         +ws) are not gated. When the hook blocks, the agent must stop an
+         +d report. It must not work around the gate.                    
+      90 +                                                               
+      91 +**Known limitation:** the hook sees file tools only. `Bash` (e.
+         +g. `ng new`, `ng generate`, `npx create-strapi-app`, shell redi
+         +rects) is not gated. So generators run only on `chore/scaffold-
+         +*` or on a `feat/` branch with an approved spec, and the review
+         +er checks that the commit range matches the branch rule.       
+      92 +                                                               
+      93  ## Traceability conventions
+      94 
+      95  | Artifact | ID / convention | Example |
+
+● Update(CLAUDE.md)
+  ⎿  Added 2 lines, removed 1 line
+       99  | Acceptance criterion | `US-NN-AC-NN` | `US-01-AC-02` |
+      100  | ADR | `ADR-NNN`, at `docs/adr/ADR-NNN-<slug>.md` | `ADR-001`
+            |
+      101  | Review finding | `REVIEW-US-NN-FNN`, in `docs/reviews/REVIEW
+           -US-NN.md` | `REVIEW-US-01-F03` |
+      102 -| Branch | `feat/US-NN-<slug>` | `feat/US-01-data-form` |     
+      102 +| Branch | `feat/US-NN-<slug>` (story); `chore/scaffold-<slug>
+          +` (infrastructure only) | `feat/US-01-data-form` |            
+      103 +| Review input | `docs/reviews/US-NN.diff` | `docs/reviews/US-
+          +01.diff` |                                                    
+      104  | Commit | Conventional Commits with story scope, plus a `Refs
+           :` trailer | see below |
+      105  | Test name | Starts with the AC ID | `US-01-AC-02 shows confi
+           gured error message` |
+      106 
+
+● Update(CLAUDE.md)
+  ⎿  Added 13 lines
+      114  - Each review finding records the hash of the commit that reso
+           lved it.
+      115  - Non-story work uses scopes such as `chore(flow)`, `chore(env
+           )`, `docs(adr)`.
+      116 
+      117 +## Review procedure (main session)                            
+      118 +                                                              
+      119 +1. Before invoking the reviewer, write the review input file `
+          +docs/reviews/US-NN.diff` from the story's commit range:       
+      120 +   ```bash                                                    
+      121 +   { echo "# US-NN review input  base=<base-sha> head=<head-sh
+          +a>"; echo "## Commits"; git log --oneline <base>..<head>;     
+      122 +     echo "## Changed files"; git diff --name-status <base>..<
+          +head>;                                                        
+      123 +     echo "## Diff"; git diff <base>..<head>; } > docs/reviews
+          +/US-NN.diff                                                   
+      124 +   ```                                                        
+      125 +2. Invoke the reviewer with the story ID, the path of the `.di
+          +ff` file and the test-writer's run summary. The reviewer reads
+          + the diff from the file, not from the prompt.                 
+      126 +3. Save the reviewer's report verbatim to `docs/reviews/REVIEW
+          +-US-NN.md`. Commit both files (`docs(US-NN): add review report
+          +`).                                                           
+      127 +4. **Every bug the test-writer reported becomes a review findi
+          +ng** (the reviewer logs it with source `test-writer`), so it g
+          +oes through HC3 like any other finding.                       
+      128 +5. Re-reviews after fixes regenerate the `.diff` for the fix r
+          +ange (`US-NN-r2.diff`, …).                                    
+      129 +                                                              
+      130  ## Definition of Done (per story)
+      131 
+      132  - [ ] Spec `SPEC-US-NN` is `Approved` (HC1); every ADR it depe
+           nds on is `Accepted` (HC2).
+
+● Update(CLAUDE.md)
+  ⎿  Added 2 lines, removed 1 line
+      134  - [ ] Works for CO and CL with seed data, and from `docker com
+           pose up` on a clean checkout.
+      135  - [ ] Loading, empty and error states are handled as specified
+           ; keyboard-only completion and accessible labels are verified;
+            layout works on mobile and desktop.
+      136  - [ ] No hard-coded country content; no write token in the fro
+           ntend; fictitious data only.
+      137 -- [ ] Review `REVIEW-US-NN` exists; every finding has a human 
+          -decision (HC3); "fix now" findings have a resolution commit.  
+      137 +- [ ] Review `REVIEW-US-NN` exists, with its input `US-NN.diff
+          +`; every test-writer bug is a finding; every finding has a hum
+          +an decision (HC3); "fix now" findings have a resolution commit
+          +.                                                             
+      138 +- [ ] For any story that touches Strapi permissions: the test 
+          +proving a public write returns 403 passes.                    
+      139  - [ ] HC4 sign-off given; README/FLOW.md updated if behavior o
+           r setup changed.
+      140  - [ ] The session is exported (see below).
+      141 
+
+● Update(CLAUDE.md)
+  ⎿  Added 15 lines, removed 1 line
+      141 
+      142  ## Session logs
+      143 
+      144 -At the end of every working session, run `/export` and save th
+          -e output to `docs/ai-sessions/` **without editing it** (name: 
+          -`YYYY-MM-DD-<phase-or-story>.txt`). These unedited logs are a 
+          -required deliverable.                                         
+      144 +These unedited logs are a required deliverable. At the end of 
+          +every working session:                                        
+      145 +                                                              
+      146 +1. **Readable export:** run `/export` and save it as `docs/ai-
+          +sessions/YYYY-MM-DD-<phase-or-story>.txt`. Don't edit it.     
+      147 +2. **Raw transcripts:** copy the session's raw JSONL files, in
+          +cluding subagents, unchanged:                                 
+      148 +   ```bash                                                    
+      149 +   SRC=~/.claude/projects/c--Proyectos-car-insurance-project  
+      150 +   DST=docs/ai-sessions/raw                                   
+      151 +   mkdir -p "$DST"                                            
+      152 +   cp "$SRC/<session-id>.jsonl" "$DST/"                       
+          +           # main session                                     
+      153 +   [ -d "$SRC/<session-id>/subagents" ] && mkdir -p "$DST/<ses
+          +sion-id>" \                                                   
+      154 +     && cp -r "$SRC/<session-id>/subagents" "$DST/<session-id>
+          +/"         # subagent transcripts + .meta.json                
+      155 +   ```                                                        
+      156 +   Layout observed on 2026-11-23: the main transcript is `<ses
+          +sion-id>.jsonl`; each subagent gets `<session-id>/subagents/ag
+          +ent-<id>.jsonl` plus `agent-<id>.meta.json`. Find the session 
+          +ID by modification time (`ls -t "$SRC"/*.jsonl | head -1`). Su
+          +bagent coverage is verified again after the first real subagen
+          +t run.                                                        
+      157 +3. **Before committing, scan without editing:** `grep -rniE "a
+          +pi[_-]?key|token|secret|password|@gmail|@[a-z0-9-]+\.(com|co|c
+          +l)" docs/ai-sessions/`. If a hit is real (a secret or personal
+          + data), **don't commit that file and don't edit it**. Stop and
+          + ask the human.                                               
+      158 +4. Commit: `docs(sessions): add <phase-or-story> session logs`
+          +.                                                             
+
+● Now the spec-writer agent and spec-authoring skill (versioning and changelog).
+
+● Update(.claude\agents\spec-writer.md)
+  ⎿  Added 1 line, removed 1 line
+      1  ---
+      2  name: spec-writer
+      3 -description: Turns one user story (docs/user-stories/US-XX.md) i
+        -nto a verifiable spec at docs/specs/SPEC-US-XX.md. Detects gaps 
+        -and ambiguities and proposes resolutions. Use at the start of ev
+        -ery story, and again when the human rejects a spec at HC1 (pass 
+        -the rejection reason).                                          
+      3 +description: Turns one user story (docs/user-stories/US-XX.md) i
+        +nto a verifiable spec at docs/specs/SPEC-US-XX.md. Detects gaps 
+        +and ambiguities and proposes resolutions. Use at the start of ev
+        +ery story, when the human rejects a spec at HC1 (pass the reject
+        +ion reason), and for any change to an already-approved spec (spe
+        +c change loop; pass the change request).                        
+      4  tools: Read, Grep, Glob, Write
+      5  model: opus
+      6  ---
+
+● Update(.claude\agents\spec-writer.md)
+  ⎿  Added 1 line
+      23  - `.claude/skills/strapi5-content-modeling/SKILL.md`: for the d
+          ata contract section.
+      24  - Any other existing specs in `docs/specs/` and ADRs in `docs/a
+          dr/`, for consistency (shared content types, shared wizard stat
+          e).
+      25  - On a re-run: the human's rejection reason from HC1 (passed in
+           the prompt).
+      26 +- On a spec change: the change request and who or what raised i
+         +t (human, implementer blocker, test-writer bug, review finding)
+         +.                                                              
+      27 
+      28  ## Steps
+      29 
+
+● Update(.claude\agents\spec-writer.md)
+  ⎿  Added 1 line, removed 1 line
+      30  1. Read the story, CLAUDE.md and the `spec-authoring` skill.
+      31  2. Read existing specs and ADRs. Reuse names for shared concept
+          s (country, wizard state, content types). Do not redefine them
+          differently.
+      32  3. Run the full gap-detection checklist from the skill against
+          the story. For each gap, write: the question, the options, your
+           proposed resolution, and why.
+      33 -4. Fill the template exactly: front matter with `status: Draft`
+         -, traceability header, scope, gaps & resolutions, CO/CL country
+         - matrix, Strapi data contract, validations, UI states, a11y, Gh
+         -erkin ACs, test mapping, out of scope.                         
+      33 +4. Fill the template exactly: front matter with `status: Draft`
+         + and `version: 1`, traceability header, scope, gaps & resolutio
+         +ns, CO/CL country matrix, Strapi data contract, validations, UI
+         + states, a11y, Gherkin ACs, test mapping, out of scope.        
+      34  5. Keep the story's original ACs (renumbered `US-XX-AC-NN`, in
+          story order) and add derived ACs for resolved gaps, marked `(de
+          rived from GAP-NN)`.
+      35  6. Where a gap needs an architecture decision (not a product de
+          cision), do not decide it: record it under "Decisions needed (A
+          DR)" for the architect.
+      36  7. On a re-run, address every point in the rejection reason and
+           add a "Revision notes" entry at the end of the spec.
+
+● Update(.claude\agents\spec-writer.md)
+  ⎿  Added 3 lines, removed 2 lines
+      33  4. Fill the template exactly: front matter with `status: Draft`
+           and `version: 1`, traceability header, scope, gaps & resolutio
+          ns, CO/CL country matrix, Strapi data contract, validations, UI
+           states, a11y, Gherkin ACs, test mapping, out of scope.
+      34  5. Keep the story's original ACs (renumbered `US-XX-AC-NN`, in
+          story order) and add derived ACs for resolved gaps, marked `(de
+          rived from GAP-NN)`.
+      35  6. Where a gap needs an architecture decision (not a product de
+          cision), do not decide it: record it under "Decisions needed (A
+          DR)" for the architect.
+      36 -7. On a re-run, address every point in the rejection reason and
+         - add a "Revision notes" entry at the end of the spec.          
+      37 -8. Write the file and return a short summary: path, AC count, g
+         -aps found, open questions for the human, ADR decisions needed. 
+      36 +7. **Re-run after an HC1 rejection (spec was never approved):**
+         + address every point in the rejection reason. Keep the same `ve
+         +rsion` and add a Changelog row ("HC1 rejection: <reason>").    
+      37 +8. **Spec change loop (spec is or was `Approved`):** follow the
+         + versioning procedure in the `spec-authoring` skill: bump `vers
+         +ion` by 1, set `status: Draft`, clear `approved_by` and `approv
+         +ed_on`, add a Changelog row (version, date, change, reason/sour
+         +ce, ACs affected), and update the Test mapping for any added, c
+         +hanged or removed AC. Never renumber or reuse an existing AC ID
+         +: removed ACs are marked `(removed in vN)`.                    
+      38 +9. Write the file and return a short summary: path, version, AC
+         + count, gaps found, open questions for the human, ADR decisions
+         + needed. For a change, also give the ACs affected and the code 
+         +or tests likely impacted.                                      
+      39 
+      40  ## Outputs
+      41 
+
+● Update(.claude\agents\spec-writer.md)
+  ⎿  Added 1 line
+      45  ## Rules / must-not
+      46 
+      47  - Never set `status: Approved`, and never fill `approved_by` or
+           `approved_on`. Only the main session does, after the human's `
+          APPROVED`.
+      48 +- Never change an `Approved` spec without bumping `version` and
+         + resetting `status: Draft`. A silent edit to an approved spec b
+         +reaks the gate. (The spec gate hook blocks story code as soon a
+         +s the status is `Draft`, which is intended.)                   
+      49  - Never modify `docs/user-stories/*`, other specs, ADRs or code
+          .
+      50  - Every AC must be observable and testable: concrete Given/When
+          /Then, no "should work properly", no untestable adjectives ("cl
+          ear", "simple") without a measurable definition.
+      51  - No hard-coded country content in the spec's design: field lis
+          ts, plans and copy are data from Strapi. The spec may list **se
+          ed** examples for CO and CL, marked as seed data.
+
+● Update(.claude\skills\spec-authoring\SKILL.md)
+  ⎿  Added 1 line, removed 1 line
+      1  ---
+      2  name: spec-authoring
+      3 -description: Template and gap-detection checklist for writing a 
+        -verifiable spec (docs/specs/SPEC-US-XX.md) from a user story in 
+        -this project. Use whenever creating or revising a spec, or when 
+        -reviewing whether a spec is ready for HC1 approval.             
+      3 +description: Template, gap-detection checklist and versioning pr
+        +ocedure for writing a verifiable spec (docs/specs/SPEC-US-XX.md)
+        + from a user story in this project. Use whenever creating or rev
+        +ising a spec (including changes to an approved spec), or when re
+        +viewing whether a spec is ready for HC1 approval.               
+      4  ---
+      5 
+      6  # Spec authoring
+
+● Update(.claude\skills\spec-authoring\SKILL.md)
+  ⎿  Added 2 lines
+      19  3. Fill the **template** below, section by section. Sections th
+          at don't apply say `N/A – <reason>`; never delete a section.
+      20  4. Self-check against "Ready for HC1" at the end.
+      21 
+      22 +To **change** an existing spec, follow "Versioning and changelo
+         +g" below instead of editing in place.                          
+      23 +                                                               
+      24  ## Gap-detection checklist
+      25 
+      26  For each item, ask the question against the story. Anything una
+          nswered becomes a `GAP-NN` (question → options → proposed resol
+          ution → rationale).
+
+● Update(.claude\skills\spec-authoring\SKILL.md)
+  ⎿  Added 1 line
+      51  - Only `find`/`findOne` on the Public role for content the app
+          reads; no tokens in the browser.
+      52  - CMS-provided text rendered safely (no unsanitized `innerHTML`
+          ; if rich text is needed, how is it sanitized?).
+      53  - Document numbers masked where displayed; no PII in logs or UR
+          Ls.
+      54 +- If the story touches Strapi content the app reads, the spec i
+         +ncludes (or references) an AC proving that a **public write ret
+         +urns 403** (Public role permissions are set automatically in `b
+         +ootstrap`).                                                    
+      55 
+      56  **Accessibility**
+      57  - Every field has a programmatic label; help and error text lin
+          ked via `aria-describedby`; required state exposed.
+
+● Update(.claude\skills\spec-authoring\SKILL.md)
+  ⎿  Added 2 lines, removed 2 lines
+      75  story: US-XX
+      76  title: <story title>
+      77  status: Draft            # Draft | Approved — only the human ap
+          proves
+      78 -approved_by:             # filled by the main session after APP
+         -ROVED at HC1                                                   
+      78 +version: 1               # +1 on every change after an approval
+         + (see Changelog)                                               
+      79 +approved_by:             # "Andres Beltran", filled by the main
+         + session after APPROVED at HC1                                 
+      80  approved_on:             # YYYY-MM-DD
+      81  adrs: []                 # e.g. [ADR-001]
+      81 -version: 1                                                     
+      82  ---
+      83 
+      84  # SPEC-US-XX – <title>
+
+● Update(.claude\skills\spec-authoring\SKILL.md)
+  ⎿  Added 21 lines, removed 3 lines
+      169 
+      170  - …
+      171 
+      172 -## Revision notes                                             
+      172 +## Changelog                                                  
+      173 
+      174 -| Version | Date | Change | Reason (e.g. HC1 rejection) |     
+      175 -|---------|------|--------|-----------------------------|     
+      174 +| Version | Date | Change | Reason / source | ACs affected | A
+          +pproval (HC1) |                                               
+      175 +|---------|------|--------|-----------------|--------------|--
+          +--------------|                                               
+      176 +| 1 | YYYY-MM-DD | Initial spec | US-XX | all | pending |     
+      177  ````
+      178 
+      179 +## Versioning and changelog                                   
+      180 +                                                              
+      181 +`version` starts at 1. The Changelog records every revision an
+          +d every approval.                                             
+      182 +                                                              
+      183 +| Situation | `version` | `status` | Changelog |              
+      184 +|-----------|-----------|----------|-----------|              
+      185 +| First draft | 1 | Draft | Row "Initial spec", approval `pend
+          +ing` |                                                        
+      186 +| Revised after an HC1 rejection (never approved yet) | unchan
+          +ged | Draft | New row with the same version: "HC1 rejection: <
+          +reason>" and what changed |                                   
+      187 +| HC1 `APPROVED` | unchanged | Approved (set by the main sessi
+          +on) | Main session fills that row's approval cell: `Approved –
+          + Andres Beltran – YYYY-MM-DD` |                               
+      188 +| **Any change after approval** (new gap, wording, AC, data co
+          +ntract, a bug that proves the spec wrong) | **+1** | **Draft**
+          + (clear `approved_by` and `approved_on`) | New row: change, re
+          +ason/source (`human`, `implementer`, `REVIEW-US-XX-FNN`, test-
+          +writer bug), ACs affected, approval `pending` |               
+      189 +                                                              
+      190 +Rules:                                                        
+      191 +- An approved spec is never edited in place. Every change goes
+          + through this table and back through HC1.                     
+      192 +- AC IDs are stable. New ACs take the next free number; remove
+          +d ACs stay in the document, struck through and marked `(remove
+          +d in vN)`; changed ACs say `(changed in vN)`.                 
+      193 +- Update the Test mapping in the same revision. The test-write
+          +r and implementer use the Changelog to see what to redo.      
+      194 +- While the spec is `Draft`, the spec gate hook blocks code ch
+          +anges for that story. Finish the HC1 loop before going back to
+          + code.                                                        
+      195 +                                                              
+      196  ## Ready for HC1 (self-check before handing over)
+      197 
+      198  - [ ] Every story AC is present with an ID `US-XX-AC-NN`, and
+           every derived AC references its `GAP-NN`.
+
+● Update(.claude\skills\spec-authoring\SKILL.md)
+  ⎿  Added 1 line
+      203  - [ ] Every AC appears in the test mapping.
+      204  - [ ] Open questions and ADR decisions are listed separately f
+           rom resolved gaps.
+      205  - [ ] `status: Draft`; approval fields are empty.
+      206 +- [ ] `version` and the Changelog are consistent (a new row fo
+          +r this revision, ACs affected listed).                        
+
+● Now the reviewer, test-writer, implementer and architect agents, plus the
+  review template.
+
+● Update(.claude\agents\reviewer.md)
+  ⎿  Added 1 line, removed 1 line
+      1  ---
+      2  name: reviewer
+      3 -description: Reviews a story's changes against its spec, accepte
+        -d ADRs, CLAUDE.md, security and accessibility. Read-only; cannot
+        - edit or run anything. Returns a review report in the docs/revie
+        -ws/0000-template.md format, which the main session saves as docs
+        -/reviews/REVIEW-US-XX.md. Use after test-writer finishes.       
+      3 +description: Reviews a story's changes against its spec, accepte
+        +d ADRs, CLAUDE.md, security and accessibility, reading the diff 
+        +from docs/reviews/US-XX.diff. Read-only; cannot edit or run anyt
+        +hing. Logs every test-writer bug as a finding. Returns a review 
+        +report in the docs/reviews/0000-template.md format, which the ma
+        +in session saves as docs/reviews/REVIEW-US-XX.md. Use after test
+        +-writer finishes.                                               
+      4  tools: Read, Grep, Glob
+      5  model: opus
+      6  ---
+
+● Update(.claude\agents\reviewer.md)
+  ⎿  Added 1 line, removed 1 line
+      12  You are the independent code reviewer. You find real problems a
+          nd explain them precisely enough to act on. You **cannot** fix
+          anything: your output is a report, and a human decides what hap
+          pens to each finding (HC3).
+      13 
+      14  **Why this agent exists:** a reviewer that can edit tends to "s
+          ilently fix", which removes the evidence of review and skips hu
+          man triage. Read-only access keeps findings visible and traceab
+          le.
+      15 -**Why these tools:** `Read`, `Grep` and `Glob` only. No `Write`
+         -, `Edit` or `Bash`. The main session provides the diff and test
+         - results, and saves your report.                               
+      15 +**Why these tools:** `Read`, `Grep` and `Glob` only. No `Write`
+         +, `Edit` or `Bash`. The main session writes the diff to a file 
+         +for you, passes the test results, and saves your report. Readin
+         +g the diff from a file avoids truncating large diffs in the pro
+         +mpt, and the `.diff` file stays in the repo as evidence of exac
+         +tly what was reviewed.                                         
+      16  **Why opus:** spotting spec drift, security issues and subtle b
+          ugs is reasoning-heavy.
+      17 
+      18  ## Inputs (provided by the main session in the prompt)
+
+● Update(.claude\agents\reviewer.md)
+  ⎿  Added 4 lines, removed 5 lines
+      15  **Why these tools:** `Read`, `Grep` and `Glob` only. No `Write`
+          , `Edit` or `Bash`. The main session writes the diff to a file
+          for you, passes the test results, and saves your report. Readin
+          g the diff from a file avoids truncating large diffs in the pro
+          mpt, and the `.diff` file stays in the repo as evidence of exac
+          tly what was reviewed.
+      16  **Why opus:** spotting spec drift, security issues and subtle b
+          ugs is reasoning-heavy.
+      17 
+      18 -## Inputs (provided by the main session in the prompt)         
+      18 +## Inputs                                                      
+      19 
+      20 -- Story ID, branch and commit range (`<base>..<head>`).        
+      21 -- The diff (`git diff <base>..<head>`) and the commit list.    
+      22 -- The test-writer's run summary.                               
+      20 +- In the prompt: story ID, branch, the path of the review input
+         + file, and the test-writer's run summary (including its **bug l
+         +ist**).                                                        
+      21 +- **`docs/reviews/US-XX.diff`** (or `US-XX-r2.diff` for a re-re
+         +view), written by the main session. It contains the commit rang
+         +e, the commit list, the changed-file list (`--name-status`) and
+         + the full diff. This is your source for what changed. If the fi
+         +le is missing or empty, stop and say so; don't review from memo
+         +ry.                                                            
+      22  - On disk: `docs/specs/SPEC-US-XX.md`, accepted ADRs, `CLAUDE.m
+          d`, skills, `docs/reviews/0000-template.md`.
+      23 
+      24  ## Steps
+      25 
+      27 -1. Read the spec, the referenced ADRs, CLAUDE.md and the releva
+         -nt skills. Then read the diff and the touched files in full.   
+      26 +1. Read the spec (note its `version`), the referenced ADRs, CLA
+         +UDE.md and the relevant skills. Then read `docs/reviews/US-XX.d
+         +iff`, and every touched file in full for context.              
+      27  2. Check, in this order:
+      28     1. **Spec conformance:** each AC is implemented as written;
+          nothing out of scope was added; the country matrix is respected
+           for CO and CL.
+      29     2. **Tests:** every AC has a test named with its ID; tests a
+          ssert behavior and aren't tautological; failing or skipped test
+          s are noted.
+
+● Update(.claude\agents\reviewer.md)  ⎿  Added 4 lines, removed 2 lines
+      32     5. **Accessibility:** labels, `aria-describedby` for errors,
+           focus management between steps, keyboard-only completion, cont
+          rast hints.
+      33     6. **Robustness:** loading, empty and error states, Strapi u
+          navailable, invalid config from CMS, double submit.
+      34     7. **Code quality:** angular-conventions adherence, typing (
+          `any`), dead code, duplication.
+      35 -3. Write each finding with an ID `REVIEW-US-XX-FNN`, severity (
+         -`blocker` | `major` | `minor` | `nit`), `file:line`, what is wr
+         -ong (with evidence), and a concrete recommendation. Leave "Huma
+         -n decision", "Resolution commit" and "Status" empty or `Open`. 
+      36 -4. Keep only real findings. If an area is clean, say so in the 
+         -summary. Don't pad.                                            
+      35 +   8. **Process:** commits follow conventions, the branch match
+         +es the spec gate rule (no feature code from `chore/scaffold-*`)
+         +, and the spec `version` the code was built against is the curr
+         +ent approved one.                                              
+      36 +3. **Log every bug reported by the test-writer as a finding**, 
+         +one finding per bug, with source `test-writer`. Use the reporte
+         +d AC, symptom and failing test as evidence, and add your own `f
+         +ile:line` analysis of the cause. Do this even if you think the 
+         +bug is minor or the test is wrong: in that case say so in the r
+         +ecommendation, and the human decides at HC3. Never drop a repor
+         +ted bug.                                                       
+      37 +4. Write each finding with an ID `REVIEW-US-XX-FNN`, source (`r
+         +eview` | `test-writer`), severity (`blocker` | `major` | `minor
+         +` | `nit`), `file:line`, what is wrong (with evidence), and a c
+         +oncrete recommendation. Leave "Human decision", "Resolution com
+         +mit" and "Status" empty or `Open`.                             
+      38 +5. Keep only real findings of your own. If an area is clean, sa
+         +y so in the summary. Don't pad.                                
+      39 
+      40  ## Outputs
+      41 
+
+● Update(.claude\agents\reviewer.md)
+  ⎿  Added 1 line
+      46  - Never propose to edit files yourself, and never claim you ran
+           anything. You have no `Bash`, so test results come only from t
+          he test-writer's summary.
+      47  - Never fill the "Human decision" or "Resolution commit" column
+          s.
+      48  - Every finding cites a `file:line` and the rule, AC or ADR it
+          violates (or the concrete risk).
+      49 +- The report must account for every test-writer bug: the "Test-
+         +writer bugs" section maps each reported bug to its finding ID. 
+      50  - On a re-review after fixes: verify each "fix now" finding aga
+          inst its resolution commit and propose `Status: Resolved` or `S
+          till open` with a reason.
+
+● Update(docs\reviews\0000-template.md)
+  ⎿  Added 1 line
+       7  | ADRs checked | ADR-NNN, … |
+       8  | Branch | `feat/US-XX-<slug>` |
+       9  | Commit range | `<base-sha>..<head-sha>` |
+      10 +| Review input | [US-XX.diff](US-XX.diff) (changed files + diff
+         +, written by the main session) |                               
+      11  | Test summary reviewed | unit: N passed / N failed · e2e: N pa
+          ssed / N failed |
+      12  | Reviewer | reviewer subagent (Claude Code, opus), read-only |
+      13  | Review date | YYYY-MM-DD |
+
+● Update(docs\reviews\0000-template.md)
+  ⎿  Added 1 line, removed 1 line
+      11  | Test summary reviewed | unit: N passed / N failed · e2e: N pa
+          ssed / N failed |
+      12  | Reviewer | reviewer subagent (Claude Code, opus), read-only |
+      13  | Review date | YYYY-MM-DD |
+      14 -| Human triage (HC3) | <name>, YYYY-MM-DD |                    
+      14 +| Human triage (HC3) | Andres Beltran, YYYY-MM-DD |            
+      15 
+      16  ## Findings
+      17 
+
+● Update(docs\reviews\0000-template.md)
+  ⎿  Added 1 line
+      15 
+      16  ## Findings
+      17 
+      18 +Source: `review` (found by the reviewer) · `test-writer` (bug r
+         +eported by the test-writer; every one must be logged here).    
+      19  Severity: `blocker` (violates an AC, a non-negotiable or securi
+          ty; must fix) · `major` (likely bug or significant deviation) ·
+           `minor` (quality issue with low risk) · `nit` (style).
+      20 
+      21  Human decision (HC3): `fix now` · `accept risk: <reason>` · `ou
+          t of scope: <reason>`.
+
+● Update(docs\reviews\0000-template.md)
+  ⎿  Added 12 lines, removed 3 lines
+      21  Human decision (HC3): `fix now` · `accept risk: <reason>` · `ou
+          t of scope: <reason>`.
+      22  Status: `Open` · `Resolved` · `Accepted` · `Deferred`.
+      23 
+      24 -| ID | Severity | File:line | Finding | Recommendation | Human 
+         -decision | Resolution commit | Status |                        
+      25 -|----|----------|-----------|---------|----------------|-------
+         ----------|-------------------|--------|                        
+      26 -| REVIEW-US-XX-F01 | major | `frontend/src/app/…:42` | <what is
+         - wrong, with evidence; rule/AC/ADR violated> | <concrete fix> |
+         - | | Open |                                                    
+      24 +| ID | Source | Severity | File:line | Finding | Recommendation
+         + | Human decision | Resolution commit | Status |               
+      25 +|----|--------|----------|-----------|---------|---------------
+         +-|----------------|-------------------|--------|               
+      26 +| REVIEW-US-XX-F01 | review | major | `frontend/src/app/…:42` |
+         + <what is wrong, with evidence; rule/AC/ADR violated> | <concre
+         +te fix> | | | Open |                                           
+      27 +| REVIEW-US-XX-F02 | test-writer | major | `frontend/src/app/…:
+         +17` | <bug as reported (AC, failing test) + reviewer's cause an
+         +alysis> | <concrete fix> | | | Open |                          
+      28 
+      29 +## Test-writer bugs                                            
+      30 +                                                               
+      31 +| Bug (as reported in the test run summary) | AC | Failing test
+         + | Finding ID |                                                
+      32 +|-------------------------------------------|----|-------------
+         +-|------------|                                                
+      33 +| <symptom> | US-XX-AC-NN | `US-XX-AC-NN …` | REVIEW-US-XX-F02 
+         +|                                                              
+      34 +                                                               
+      35 +(Write "None reported" if the test-writer reported no bugs.)   
+      36 +                                                               
+      37  ## Spec conformance
+      38 
+      39  | AC ID | Implemented | Tested (test name) | Notes |
+
+● Update(.claude\agents\test-writer.md)
+  ⎿  Added 2 lines, removed 1 line
+      29  4. Name every test starting with its AC ID: `US-01-AC-02 shows
+          configured error message`. Tests that aren't tied to an AC use
+          the prefix `US-XX-extra`.
+      30  5. Run the suites. If a test fails because the **code** is wron
+          g, keep the test, mark it with a `// BUG:` comment and report i
+          t. Don't touch production code, and don't weaken the assertion.
+      31  6. Commit test files only: `test(US-XX): <summary>` + `Refs: SP
+          EC-US-XX`.
+      32 -7. Return a test run summary: commands run, pass/fail counts pe
+         -r suite, an AC → test(s) → result table, bugs found (AC, sympto
+         -m, likely location), and ACs that can't be automated (with the 
+         -reason, flagged for manual check at HC4).                      
+      32 +7. Return a test run summary: commands run, pass/fail counts pe
+         +r suite, an AC → test(s) → result table, a **numbered bug list*
+         +* (`TW-BUG-NN`: AC, failing test name, symptom, expected vs act
+         +ual, likely location), and ACs that can't be automated (with th
+         +e reason, flagged for manual check at HC4). Each `TW-BUG-NN` be
+         +comes a review finding: the reviewer must log all of them, so t
+         +hey reach HC3.                                                 
+      33 +8. When the story touches Strapi permissions, include the **pub
+         +lic-write test**: an anonymous `POST`/`PUT`/`DELETE` to each co
+         +ntent type the app reads (e.g. `/api/plans`) must return `403`.
+         + Name it after its AC (or `US-XX-extra public write returns 403
+         +` if the spec has no AC yet, and report the missing AC as a spe
+         +c gap).                                                        
+      34 
+      35  ## Outputs
+      36 
+
+● Update(.claude\agents\implementer.md)
+  ⎿  Added 3 lines, removed 2 lines
+      24 
+      25  ## Steps
+      26 
+      27 -1. **Gate check.** Read the spec front matter. If `status` is n
+         -ot `Approved`, or a referenced ADR is not `Accepted`, **stop im
+         -mediately** and reply: `REFUSED: SPEC-US-XX is <status>` (or na
+         -mes the unaccepted ADR). Do not write any file.                
+      28 -2. Make sure you are on branch `feat/US-XX-<slug>` (create it f
+         -rom `main` if missing).                                        
+      27 +1. **Gate check.** Read the spec front matter. If `status` is n
+         +ot `Approved`, or a referenced ADR is not `Accepted`, **stop im
+         +mediately** and reply: `REFUSED: SPEC-US-XX is <status>` (or na
+         +mes the unaccepted ADR). Do not write any file. The `spec-gate`
+         + hook enforces the same rule on `Write`/`Edit` under `frontend/
+         +` and `cms/`. If the hook blocks you, stop and report the messa
+         +ge. Never work around it (for example by writing files through 
+         +`Bash`).                                                       
+      28 +2. Make sure you are on branch `feat/US-XX-<slug>` (create it f
+         +rom `main` if missing). Infrastructure-only work (`ng new`, Str
+         +api project creation, Docker, config) goes on `chore/scaffold-<
+         +slug>` and must not add anything under `frontend/src/app/featur
+         +es/`. Run generators through `Bash` only on one of these branch
+         +es.                                                            
+      29 +3. Note the spec `version` you are implementing in your summary
+         +. If the spec changes during implementation (status back to `Dr
+         +aft`), stop.                                                   
+      30  3. Plan the change as a list of small steps, each mapped to the
+           AC IDs it serves.
+      31  4. Implement step by step. After each coherent unit, run the bu
+          ild and lint (and existing tests if any) and commit:
+      32     `feat(US-XX): <imperative summary>` + blank line + `Refs: SP
+          EC-US-XX[, ADR-NNN]`.
+
+● Update(.claude\agents\implementer.md)
+  ⎿  Added 2 lines, removed 2 lines
+      27  1. **Gate check.** Read the spec front matter. If `status` is n
+          ot `Approved`, or a referenced ADR is not `Accepted`, **stop im
+          mediately** and reply: `REFUSED: SPEC-US-XX is <status>` (or na
+          mes the unaccepted ADR). Do not write any file. The `spec-gate`
+           hook enforces the same rule on `Write`/`Edit` under `frontend/
+          ` and `cms/`. If the hook blocks you, stop and report the messa
+          ge. Never work around it (for example by writing files through
+          `Bash`).
+      28  2. Make sure you are on branch `feat/US-XX-<slug>` (create it f
+          rom `main` if missing). Infrastructure-only work (`ng new`, Str
+          api project creation, Docker, config) goes on `chore/scaffold-<
+          slug>` and must not add anything under `frontend/src/app/featur
+          es/`. Run generators through `Bash` only on one of these branch
+          es.
+      29  3. Note the spec `version` you are implementing in your summary
+          . If the spec changes during implementation (status back to `Dr
+          aft`), stop.
+      30 -3. Plan the change as a list of small steps, each mapped to the
+         - AC IDs it serves.                                             
+      31 -4. Implement step by step. After each coherent unit, run the bu
+         -ild and lint (and existing tests if any) and commit:           
+      30 +4. Plan the change as a list of small steps, each mapped to the
+         + AC IDs it serves.                                             
+      31 +5. Implement step by step. After each coherent unit, run the bu
+         +ild and lint (and existing tests if any) and commit:           
+      32     `feat(US-XX): <imperative summary>` + blank line + `Refs: SP
+          EC-US-XX[, ADR-NNN]`.
+      33  5. Strapi changes (schemas, seeds, permissions) follow the `str
+          api5-content-modeling` skill; seed data covers **both** CO and
+          CL and is fictitious.
+      34  6. For a fix run: one commit per finding where practical, `fix(
+          US-XX): <summary>` with `Refs: SPEC-US-XX, REVIEW-US-XX-FNN`. R
+          eport each finding ID with its commit hash.
+
+● Update(.claude\agents\implementer.md)
+  ⎿  Couldn't edit file
+
+● Update(.claude\agents\implementer.md)
+  ⎿  Added 1 line, removed 1 line
+      32     `feat(US-XX): <imperative summary>` + blank line + `Refs: SP
+          EC-US-XX[, ADR-NNN]`.
+      33  5. Strapi changes (schemas, seeds, permissions) follow the `str
+          api5-content-modeling` skill; seed data covers **both** CO and
+          CL and is fictitious.
+      34  6. For a fix run: one commit per finding where practical, `fix(
+          US-XX): <summary>` with `Refs: SPEC-US-XX, REVIEW-US-XX-FNN`. R
+          eport each finding ID with its commit hash.
+      35 -7. Finish with a summary: commits (hash + subject), files touch
+         -ed, ACs covered, deviations or blockers, and how to run it.    
+      35 +8. Finish with a summary: spec version implemented, commits (ha
+         +sh + subject), files touched, ACs covered, deviations or blocke
+         +rs, and how to run it. If a blocker means the spec is wrong, sa
+         +y so explicitly: it triggers the spec change loop.             
+      36 
+      37  ## Outputs
+      38 
+
+● Update(.claude\agents\architect.md)
+  ⎿  Added 4 lines, removed 1 line
+       9 
+      10  ## Role
+      11 
+      12 -You make architecture decisions explicit, comparable and revers
+         -ible on paper before code makes them expensive. You write ADRs;
+         - you do not implement them. The mandatory first ADR is the **mu
+         -lti-country content strategy** (how content is differentiated b
+         -y country in Strapi, and how Angular resolves and consumes the 
+         -country).                                                      
+      12 +You make architecture decisions explicit, comparable and revers
+         +ible on paper before code makes them expensive. You write ADRs;
+         + you do not implement them. Two ADRs are mandatory:            
+      13 
+      14 +- **Multi-country content strategy:** how content is differenti
+         +ated by country in Strapi, and how Angular resolves and consume
+         +s the country.                                                 
+      15 +- **Public role permissions set automatically in Strapi's `boot
+         +strap`**, so `docker compose up` stays one command. The human h
+         +as already chosen this option, so the ADR records it: the alter
+         +natives (manual admin setup, `strapi import` of config, bootstr
+         +ap) and the consequences. These include that it relies on **und
+         +ocumented internal Users & Permissions APIs** (see the `strapi5
+         +-content-modeling` skill), the version-upgrade risk, and the mi
+         +tigation: one isolated function that grants an explicit allow-l
+         +ist, plus a test proving a public write returns 403.           
+      16 +                                                               
+      17  **Why this agent exists:** separating decisions from implementa
+          tion lets the human judge trade-offs at HC2 without reading cod
+          e, and gives implementer and reviewer a fixed reference.
+      18  **Why these tools:** read access plus `Write` for new ADR files
+          . `WebFetch` is there to check framework capabilities (Strapi 5
+          , Angular) against official docs instead of memory. No `Edit`,
+          no `Bash`.
+      19  **Why opus:** comparing alternatives and their consequences is
+          reasoning-heavy.
+
+● Update(docs\adr\0000-template.md)
+  ⎿  Added 1 line, removed 1 line
+      3  title: <short decision title, phrased as the problem solved>
+      4  status: Proposed          # Proposed | Accepted | Superseded
+      5  date: YYYY-MM-DD
+      6 -deciders: <human approver>, architect (Claude Code subagent)    
+      6 +deciders: Andres Beltran, architect (Claude Code subagent)      
+      7  related_specs: [SPEC-US-XX]
+      8  supersedes:               # ADR-NNN, if any
+      9  superseded_by:            # ADR-NNN, if any
+  ⎿  1 skill available
+
+● One implementer edit didn't apply; checking the current numbering.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Update(.claude\agents\implementer.md)
+  ⎿  Added 2 lines, removed 2 lines
+      30  4. Plan the change as a list of small steps, each mapped to the
+           AC IDs it serves.
+      31  5. Implement step by step. After each coherent unit, run the bu
+          ild and lint (and existing tests if any) and commit:
+      32     `feat(US-XX): <imperative summary>` + blank line + `Refs: SP
+          EC-US-XX[, ADR-NNN]`.
+      33 -5. Strapi changes (schemas, seeds, permissions) follow the `str
+         -api5-content-modeling` skill; seed data covers **both** CO and 
+         -CL and is fictitious.                                          
+      34 -6. For a fix run: one commit per finding where practical, `fix(
+         -US-XX): <summary>` with `Refs: SPEC-US-XX, REVIEW-US-XX-FNN`. R
+         -eport each finding ID with its commit hash.                    
+      33 +6. Strapi changes (schemas, seeds, permissions) follow the `str
+         +api5-content-modeling` skill. Seed data covers **both** CO and 
+         +CL and is fictitious. Public role permissions are granted in `b
+         +ootstrap` exactly as the accepted permissions ADR says: `find`/
+         +`findOne` only, nothing else.                                  
+      34 +7. For a fix run: one commit per finding where practical, `fix(
+         +US-XX): <summary>` with `Refs: SPEC-US-XX, REVIEW-US-XX-FNN`. R
+         +eport each finding ID with its commit hash.                    
+      35  8. Finish with a summary: spec version implemented, commits (ha
+          sh + subject), files touched, ACs covered, deviations or blocke
+          rs, and how to run it. If a blocker means the spec is wrong, sa
+          y so explicitly: it triggers the spec change loop.
+      36 
+      37  ## Outputs
+
+● Now the Strapi skill (point 4) and the Angular skill (target 21 LTS).
+
+● Update(.claude\skills\strapi5-content-modeling\SKILL.md)
+  ⎿  Added 12 lines, removed 1 line
+      106  - All content types are **private by default**. The Public rol
+           e exists by default and can't be deleted ([users-permissions](
+           https://docs.strapi.io/cms/features/users-permissions), [REST]
+           (https://docs.strapi.io/cms/api/rest)).
+      107  - Grant the Public role **only `find`** (and `findOne` only if
+            a spec needs single-entry reads) on: `country`, `form-field`,
+            `plan`. Nothing else: no `create`/`update`/`delete`, no uploa
+           d, no users-permissions endpoints beyond defaults.
+      108  - Justification to record in the ADR/README: the app is anonym
+           ous and read-only; the quote and payment are simulated client-
+           side, so no write endpoint is ever needed.
+      109 -- **Setting permissions automatically.** The docs only describ
+          -e the admin UI (Settings → Users & Permissions → Roles → Publi
+          -c). **Programmatic permission setup in `bootstrap` is NOT docu
+          -mented.** It is commonly done by querying the internal `plugin
+          -::users-permissions.role` / `plugin::users-permissions.permiss
+          -ion` models, which is an **[unverified] internal API** that ma
+          -y change between minor versions. If we use it (needed so `dock
+          -er compose up` works without manual clicks), the code must be 
+          -isolated in one function, assert the exact actions it grants, 
+          -have an e2e check that a write returns 403, and be recorded in
+          - an ADR as a known risk.                                      
+      109 +### Project decision: permissions are set automatically in `bo
+          +otstrap`                                                      
+      110 
+      111 +So that `docker compose up` stays one command with no clicks i
+          +n the admin panel, the Public role permissions are **granted i
+          +n `bootstrap`**. The architect records this in an ADR (alterna
+          +tives: manual admin setup, `strapi import` of config, bootstra
+          +p). Know what you are relying on:                             
+      112 +                                                              
+      113 +- The docs only describe the admin UI (Settings → Users & Perm
+          +issions → Roles → Public). **Setting permissions in code is no
+          +t documented.** It's commonly done by querying the internal `p
+          +lugin::users-permissions.role` (type `public`) and creating ro
+          +ws in `plugin::users-permissions.permission` with action strin
+          +gs like `api::plan.plan.find`. That's an **[unverified] intern
+          +al API** that may change between versions. Before writing it, 
+          +check the model UIDs and the action format against the running
+          + instance (create one permission in the admin panel, then read
+          + it back with `strapi.db.query`).                             
+      114 +- Implementation rules:                                       
+      115 +  1. One isolated function, `grantPublicReadPermissions(strapi
+          +)` in `cms/src/bootstrap/permissions.ts`, called from `bootstr
+          +ap`.                                                          
+      116 +  2. An **explicit allow-list** constant (e.g. `['api::country
+          +.country.find', 'api::form-field.form-field.find', 'api::plan.
+          +plan.find']`), never a pattern or a loop over all content type
+          +s.                                                            
+      117 +  3. Idempotent: create only missing permissions. It never gra
+          +nts anything outside the list. It logs what it granted.       
+      118 +  4. It runs on every start, so a fresh container is always co
+          +rrect.                                                        
+      119 +- **Mandatory test:** an automated test proves that an anonymo
+          +us write is refused: `POST /api/plans` (and `PUT`/`DELETE` on 
+          +an existing `documentId`, for each content type the app reads)
+          + returns **403**. The test-writer adds it to the first story t
+          +hat touches Strapi. A positive check (`GET /api/plans` returns
+          + 200) proves the grant worked.                                
+      120 +- After a Strapi upgrade, the 403 test and a GET smoke test mu
+          +st pass before merging.                                       
+      121 +                                                              
+      122  ## 7. Tokens, secrets, CORS
+      123 
+      124  - **No API token in the frontend, of any type.** The Public ro
+           le serves anonymous reads. A token in SPA code is visible to e
+           very visitor. (This is our inference: the docs advise read-onl
+           y, narrowly scoped, rotated tokens kept in a secrets manager,
+           but don't spell out the SPA case ([api-tokens](https://docs.st
+           rapi.io/cms/features/api-tokens)).) Token types are Read-only
+           (`find`/`findOne` only), Full access and Custom. Strapi pre-ge
+           nerates a Full access and a Read-only token: never copy either
+            into `frontend/`.
+
+● Update(.claude\skills\angular-conventions\SKILL.md)
+  ⎿  Added 1 line, removed 1 line
+       5 
+       6  # Angular conventions (project)
+       7 
+       8 -Checked against angular.dev on 2026-11-23. The site was at **v2
+         -2.3**; v22 is the active release and **v21 is LTS**. We target 
+         -**Angular 21+**: the rules below work on both. Items marked **[
+         -unverified]** weren't confirmed on angular.dev; check the linke
+         -d page before use.                                             
+       8 +Checked against angular.dev on 2026-11-23. The site was at **v2
+         +2.3**; v22 is the active release and **v21 is LTS** (LTS until 
+         +2027-06). **This project uses Angular 21 (LTS)**: scaffold with
+         + `@angular/cli@21` and pin `^21` in `package.json`. Where angul
+         +ar.dev describes v22-only behavior, the v21 rule is stated belo
+         +w. Items marked **[unverified]** weren't confirmed on angular.d
+         +ev; check the linked page before use.                          
+       9 
+      10  ## 1. Components
+      11 
+
+● Update(.claude\skills\angular-conventions\SKILL.md)
+  ⎿  Added 1 line, removed 1 line
+      10  ## 1. Components
+      11 
+      12  - **Standalone only.** Standalone is the default since v19, so
+          don't write `standalone: true` or create any NgModule ([compone
+          nts](https://angular.dev/guide/components)).
+      13 -- **OnPush:** always set `changeDetection: ChangeDetectionStrat
+         -egy.OnPush`. It's the default since v22 ([skipping-subtrees](ht
+         -tps://angular.dev/best-practices/skipping-subtrees)), but setti
+         -ng it explicitly keeps v21 behavior identical. Zoneless is the 
+         -default since v21. Never add `provideZoneChangeDetection` or zo
+         -ne.js ([zoneless](https://angular.dev/guide/zoneless)).        
+      13 +- **OnPush:** always set `changeDetection: ChangeDetectionStrat
+         +egy.OnPush`. It only becomes the default in v22 ([skipping-subt
+         +rees](https://angular.dev/best-practices/skipping-subtrees)), s
+         +o on v21 it **must** be explicit. Zoneless is the default since
+         + v21. Never add `provideZoneChangeDetection` or zone.js ([zonel
+         +ess](https://angular.dev/guide/zoneless)).                     
+      14  - **DI with `inject()`**, never constructor parameters ([style 
+          guide](https://angular.dev/style-guide)).
+      15  - Inputs and outputs: `input()`, `input.required<T>()`, `output
+          <T>()`, `model()`. Mark them `readonly` ([inputs](https://angul
+          ar.dev/guide/components/inputs), [outputs](https://angular.dev/
+          guide/components/outputs)). Signal queries `viewChild()`/`viewC
+          hildren()` **[unverified]**: see [queries](https://angular.dev/
+          guide/components/queries).
+      16  - Template-only members are `protected`. Use `[class.x]`/`[styl
+          e.x]` bindings, not `ngClass`/`ngStyle`. Name handlers by inten
+          t (`saveDraft()`, not `onClick()`) (style guide).
+
+● Update(.claude\skills\angular-conventions\SKILL.md)
+  ⎿  Added 1 line, removed 1 line
+      1  ---
+      2  name: angular-conventions
+      3 -description: Angular 21+ conventions for frontend/ in this proje
+        -ct: standalone components, signals for state, built-in control f
+        -low, typed reactive forms built from Strapi config, inject(), On
+        -Push, feature folders, the loading/error pattern, testing setup 
+        -and the accessibility checklist for the wizard. Use for any code
+        - or review work in frontend/.                                   
+      3 +description: Angular 21 (LTS) conventions for frontend/ in this 
+        +project: standalone components, signals for state, built-in cont
+        +rol flow, typed reactive forms built from Strapi config, inject(
+        +), OnPush, feature folders, the loading/error pattern, testing s
+        +etup and the accessibility checklist for the wizard. Use for any
+        + code or review work in frontend/.                              
+      4  ---
+      5 
+      6  # Angular conventions (project)
+
+● The HttpClient note was based on v22 docs, so it needs a v21 caveat:
+● Update(.claude\skills\angular-conventions\SKILL.md)
+  ⎿  Added 1 line, removed 1 line
+      37 
+      38  ## 4. Data loading and the loading/error pattern
+      39 
+      40 -- `HttpClient` uses fetch by default, so plain `provideHttpClie
+         -nt()` is enough. **Don't use `withFetch()`** ([http setup](http
+         -s://angular.dev/guide/http/setup)).                            
+      40 +- HTTP: the current (v22) docs say `HttpClient` uses fetch by d
+         +efault and list only `withXhr()` ([http setup](https://angular.
+         +dev/guide/http/setup)). **[unverified] for v21**: on v21, regis
+         +ter `provideHttpClient(withFetch())` in `app.config.ts`, after 
+         +checking the v21 docs (v21.angular.dev/guide/http/setup) when s
+         +caffolding. Record the result here.                            
+      41  - Read Strapi content with `httpResource()` or `resource()` ins
+          ide a feature `*-api.ts` service ([http-resource](https://angul
+          ar.dev/guide/http/http-resource), [resource](https://angular.de
+          v/guide/signals/resource)). Read-only GETs only.
+      42  - Map raw Strapi responses to **typed domain models** in one ma
+          pper function (`toFormFieldConfig()`), unit-tested. Components
+          never see raw Strapi shapes. No `any`. Unknown field types and
+          invalid configs are dropped and logged with `console.warn`, nev
+          er crash the form.
+      43  - Every remote view handles all four states, driven by `status(
+          )`/`isLoading()`/`error()`/`hasValue()`:
+
+● Now FLOW.md: the diagram, the steps table and the gate section.
+
+● Update(FLOW.md)
+  ⎿  Added 2 lines, removed 1 line
+      17      US[/"User story<br/>docs/user-stories/US-XX.md"/] --> SW["s
+          pec-writer (opus)<br/>docs/specs/SPEC-US-XX.md"]
+      18      SW --> HC1{"HC1<br/>Human approves spec?"}
+      19      HC1 -- "REJECTED: reason" --> SW
+      20 -    HC1 -- APPROVED --> NEED{"New architecture<br/>decision nee
+         -ded?"}                                                         
+      20 +    HC1 -- APPROVED --> GATE[["spec-gate hook<br/>unlocks feat/
+         +US-XX writes"]]                                                
+      21 +    GATE --> NEED{"New architecture<br/>decision needed?"}     
+      22      NEED -- yes --> AR["architect (opus)<br/>docs/adr/ADR-NNN-*
+          .md"]
+      23      AR --> HC2{"HC2<br/>Human approves ADR?"}
+      24      HC2 -- "REJECTED: reason" --> AR
+
+● Update(FLOW.md)
+  ⎿  Added 2 lines, removed 1 line
+      25      HC2 -- APPROVED --> IM
+      26      NEED -- no --> IM["implementer (sonnet)<br/>code + atomic c
+          ommits<br/>(refuses if spec not Approved)"]
+      27      IM --> TW["test-writer (sonnet)<br/>unit + e2e tests mapped
+           to ACs"]
+      28 -    TW --> RV["reviewer (opus, read-only)<br/>docs/reviews/REVI
+         -EW-US-XX.md"]                                                  
+      28 +    TW -- "test summary +<br/>TW-BUG list" --> DIFF["main sessi
+         +on writes<br/>docs/reviews/US-XX.diff"]                        
+      29 +    DIFF --> RV["reviewer (opus, read-only)<br/>reads US-XX.dif
+         +f; logs every<br/>TW-BUG as a finding<br/>docs/reviews/REVIEW-U
+         +S-XX.md"]                                                      
+      30      RV --> HC3{"HC3<br/>Human triages each finding"}
+      31      HC3 -- "fix now" --> FX["implementer fixes<br/>fix commits
+          ref finding IDs"]
+      32      FX --> RT["test-writer re-runs tests"]
+
+● Update(FLOW.md)
+  ⎿  Added 8 lines
+      35      HC4 -- "REJECTED: notes" --> IM
+      36      HC4 -- APPROVED --> QA(["Ready for QA"])
+      37 
+      38 +    %% Spec change loop: any change after approval             
+      39 +    IM -. "spec wrong / blocker" .-> CHG                       
+      40 +    HC3 -. "finding needs spec change" .-> CHG                 
+      41 +    HC4 -. "spec change needed" .-> CHG                        
+      42 +    CHG["spec-writer: version+1,<br/>status: Draft, changelog r
+         +ow<br/>(gate re-locks story code)"] --> HC1                    
+      43 +                                                               
+      44      classDef human fill:#fde68a,stroke:#b45309,color:#000;
+      45 +    classDef control fill:#dbeafe,stroke:#1d4ed8,color:#000;   
+      46      class HC1,HC2,HC3,HC4,NEED human;
+      47 +    class GATE,CHG control;                                    
+      48  ```
+      49 
+      50  **Order of work:** all specs (US-01..03) and the ADRs come firs
+          t, then implementation US-01 → US-02 → US-03. The multi-country
+           decision affects every screen, so it is taken once, up front.
+
+● Update(FLOW.md)
+  ⎿  Added 2 lines, removed 1 line
+      54  | Step | Description | AI used? | AI, agent, subagent or skill
+          used | Deliverable produced | Human in the loop |
+      55  |------|-------------|----------|------------------------------
+          -----|----------------------|-------------------|
+      56  | 0. Flow design | The human decides the flow, agents, checkpoi
+          nts, gates and conventions (written in `docs/prompts/phase-0-pr
+          ompt.md`). Claude Code drafts the context file, agents, skills
+          and templates from those decisions, and verifies Strapi/Angular
+           facts against official docs. | Yes | Claude Code (Opus 5.5), m
+          ain session; web-fetch helper for docs.strapi.io and angular.de
+          v | `docs/prompts/phase-0-prompt.md`, `CLAUDE.md`, `.claude/age
+          nts/*`, `.claude/skills/*`, `docs/adr/0000-template.md`, `docs/
+          reviews/0000-template.md`, `docs/user-stories/*`, `FLOW.md`, `R
+          EADME.md` | Human writes the decisions, reviews all generated f
+          iles, and answers `APPROVED` / `REJECTED: <reason>`. On rejecti
+          on, Claude Code revises. Commit only after approval. |
+      57 -| 1. Spec | Turns the story into a verifiable spec: gaps with p
+         -roposed resolutions, CO/CL matrix, Strapi data contract, Gherki
+         -n ACs with IDs, test mapping. | Yes | Claude Code → `spec-write
+         -r` subagent (opus) + `spec-authoring` skill (+ `strapi5-content
+         --modeling`) | `docs/specs/SPEC-US-XX.md` (`status: Draft`) | **
+         -HC1.** The human checks that every AC is testable, gaps are res
+         -olved, and country behavior is explicit. `APPROVED` → main sess
+         -ion sets `status: Approved`, `approved_by`, `approved_on`. `REJ
+         -ECTED: <reason>` → spec-writer re-runs with the reason. |      
+      57 +| 1. Spec | Turns the story into a verifiable spec: gaps with p
+         +roposed resolutions, CO/CL matrix, Strapi data contract, Gherki
+         +n ACs with IDs, test mapping, `version` + Changelog. | Yes | Cl
+         +aude Code → `spec-writer` subagent (opus) + `spec-authoring` sk
+         +ill (+ `strapi5-content-modeling`) | `docs/specs/SPEC-US-XX.md`
+         + (`status: Draft`, `version: 1`) | **HC1.** Andres Beltran chec
+         +ks that every AC is testable, gaps are resolved, and country be
+         +havior is explicit. `APPROVED` → main session sets `status: App
+         +roved`, `approved_by`, `approved_on` and records the approval i
+         +n the Changelog. `REJECTED: <reason>` → spec-writer re-runs wit
+         +h the reason. |                                                
+      58 +| 1b. Spec change (loop) | Any change to an approved spec (rais
+         +ed by the human, an implementer blocker, a test-writer bug or a
+         + review finding) bumps `version`, resets `status: Draft`, and a
+         +dds a Changelog row with the ACs affected. The spec gate then r
+         +e-locks that story's code. | Yes | `spec-writer` (opus) + `spec
+         +-authoring` (versioning procedure) + `spec-gate` hook | Updated
+         + `docs/specs/SPEC-US-XX.md` (`version: N+1`) | **HC1 again**, s
+         +ame criteria. Code work on the story resumes only after `APPROV
+         +ED`. |                                                         
+      59  | 2. Architecture decisions | Identifies decisions that need an
+           ADR (at minimum the multi-country strategy) and writes them wi
+          th ≥ 3 real alternatives and consequences; verifies framework f
+          acts on official docs. Skipped when no new decision is needed.
+          | Yes | Claude Code → `architect` subagent (opus) + Strapi/Angu
+          lar skills + WebFetch | `docs/adr/ADR-NNN-*.md` (`status: Propo
+          sed`) | **HC2.** The human checks for real alternatives, a just
+          ified choice and stated consequences. `APPROVED` → `status: Acc
+          epted`. `REJECTED: <reason>` → architect re-runs. |
+      60  | 3. Implementation | Implements the approved spec in Angular/S
+          trapi with atomic Conventional Commits (`feat(US-XX): …`, `Refs
+          : SPEC-US-XX, ADR-NNN`). Refuses if the spec isn't `Approved`.
+          | Yes | Claude Code → `implementer` subagent (sonnet) + `angula
+          r-conventions`, `strapi5-content-modeling` | Code in `frontend/
+          `, `cms/`; commits on `feat/US-XX-<slug>` | No checkpoint (the
+          status gate enforces HC1/HC2 upstream); the human sees results
+          at HC3/HC4. |
+      61  | 4. Tests | Writes unit and e2e tests 1:1 with the ACs (names
+          start with the AC ID), runs them, reports bugs without touching
+           production code. | Yes | Claude Code → `test-writer` subagent
+          (sonnet) + `angular-conventions` | `frontend/src/**/*.spec.ts`,
+           `frontend/e2e/**`, test run summary | No checkpoint; failing t
+          ests and bugs are surfaced at HC3. |
+
+● Update(FLOW.md)
+  ⎿  Added 3 lines, removed 3 lines
+      57  | 1. Spec | Turns the story into a verifiable spec: gaps with p
+          roposed resolutions, CO/CL matrix, Strapi data contract, Gherki
+          n ACs with IDs, test mapping, `version` + Changelog. | Yes | Cl
+          aude Code → `spec-writer` subagent (opus) + `spec-authoring` sk
+          ill (+ `strapi5-content-modeling`) | `docs/specs/SPEC-US-XX.md`
+           (`status: Draft`, `version: 1`) | **HC1.** Andres Beltran chec
+          ks that every AC is testable, gaps are resolved, and country be
+          havior is explicit. `APPROVED` → main session sets `status: App
+          roved`, `approved_by`, `approved_on` and records the approval i
+          n the Changelog. `REJECTED: <reason>` → spec-writer re-runs wit
+          h the reason. |
+      58  | 1b. Spec change (loop) | Any change to an approved spec (rais
+          ed by the human, an implementer blocker, a test-writer bug or a
+           review finding) bumps `version`, resets `status: Draft`, and a
+          dds a Changelog row with the ACs affected. The spec gate then r
+          e-locks that story's code. | Yes | `spec-writer` (opus) + `spec
+          -authoring` (versioning procedure) + `spec-gate` hook | Updated
+           `docs/specs/SPEC-US-XX.md` (`version: N+1`) | **HC1 again**, s
+          ame criteria. Code work on the story resumes only after `APPROV
+          ED`. |
+      59  | 2. Architecture decisions | Identifies decisions that need an
+           ADR (at minimum the multi-country strategy) and writes them wi
+          th ≥ 3 real alternatives and consequences; verifies framework f
+          acts on official docs. Skipped when no new decision is needed.
+          | Yes | Claude Code → `architect` subagent (opus) + Strapi/Angu
+          lar skills + WebFetch | `docs/adr/ADR-NNN-*.md` (`status: Propo
+          sed`) | **HC2.** The human checks for real alternatives, a just
+          ified choice and stated consequences. `APPROVED` → `status: Acc
+          epted`. `REJECTED: <reason>` → architect re-runs. |
+      60 -| 3. Implementation | Implements the approved spec in Angular/S
+         -trapi with atomic Conventional Commits (`feat(US-XX): …`, `Refs
+         -: SPEC-US-XX, ADR-NNN`). Refuses if the spec isn't `Approved`. 
+         -| Yes | Claude Code → `implementer` subagent (sonnet) + `angula
+         -r-conventions`, `strapi5-content-modeling` | Code in `frontend/
+         -`, `cms/`; commits on `feat/US-XX-<slug>` | No checkpoint (the 
+         -status gate enforces HC1/HC2 upstream); the human sees results 
+         -at HC3/HC4. |                                                  
+      61 -| 4. Tests | Writes unit and e2e tests 1:1 with the ACs (names 
+         -start with the AC ID), runs them, reports bugs without touching
+         - production code. | Yes | Claude Code → `test-writer` subagent 
+         -(sonnet) + `angular-conventions` | `frontend/src/**/*.spec.ts`,
+         - `frontend/e2e/**`, test run summary | No checkpoint; failing t
+         -ests and bugs are surfaced at HC3. |                           
+      62 -| 5. Review | Reviews the diff against the spec, ADRs, CLAUDE.m
+         -d, security and a11y. Read-only; returns a report that the main
+         - session saves. | Yes | Claude Code → `reviewer` subagent (opus
+         -, Read/Grep/Glob only) | `docs/reviews/REVIEW-US-XX.md` | **HC3
+         -.** The human decides per finding: `fix now` / `accept risk (re
+         -ason)` / `out of scope`, recorded in the report. |             
+      60 +| 3. Implementation | Implements the approved spec in Angular/S
+         +trapi with atomic Conventional Commits (`feat(US-XX): …`, `Refs
+         +: SPEC-US-XX, ADR-NNN`). Refuses if the spec isn't `Approved`, 
+         +and the `spec-gate` hook blocks file writes under `frontend/`/`
+         +cms/` unless the branch and spec status allow them. Infrastruct
+         +ure goes on `chore/scaffold-*`. | Yes | Claude Code → `implemen
+         +ter` subagent (sonnet) + `angular-conventions`, `strapi5-conten
+         +t-modeling`; `.claude/hooks/spec-gate.mjs` | Code in `frontend/
+         +`, `cms/`; commits on `feat/US-XX-<slug>` | No checkpoint: the 
+         +gate enforces HC1/HC2 upstream, and the human sees results at H
+         +C3/HC4. |                                                      
+      61 +| 4. Tests | Writes unit and e2e tests 1:1 with the ACs (names 
+         +start with the AC ID), plus the public-write-returns-403 test w
+         +hen Strapi is touched. Runs them and reports bugs as `TW-BUG-NN
+         +` without touching production code. | Yes | Claude Code → `test
+         +-writer` subagent (sonnet) + `angular-conventions` | `frontend/
+         +src/**/*.spec.ts`, `frontend/e2e/**`, test run summary with bug
+         + list | No checkpoint; every `TW-BUG` becomes a review finding 
+         +and reaches HC3. |                                             
+      62 +| 5. Review | The main session writes the commit list, changed 
+         +files and diff to `docs/reviews/US-XX.diff`. The reviewer reads
+         + it, reviews against the spec, ADRs, CLAUDE.md, security and a1
+         +1y, and logs every test-writer bug as a finding. Read-only; ret
+         +urns a report that the main session saves. | Yes | Claude Code 
+         +main session (diff file) → `reviewer` subagent (opus, Read/Grep
+         +/Glob only) | `docs/reviews/US-XX.diff`, `docs/reviews/REVIEW-U
+         +S-XX.md` | **HC3.** Andres Beltran decides per finding: `fix no
+         +w` / `accept risk (reason)` / `out of scope`, recorded in the r
+         +eport. A finding that shows the spec is wrong goes to the spec 
+         +change loop (1b). |                                            
+      63  | 6. Fixes | Implementer fixes the "fix now" findings (`fix(US-
+          XX): …`, `Refs: REVIEW-US-XX-FNN`); test-writer re-runs the sui
+          tes; the resolution commit is recorded per finding. | Yes | `im
+          plementer` (sonnet), `test-writer` (sonnet) | Fix commits; upda
+          ted review table | The human reviewed the selection at HC3; the
+           result is checked at HC4. |
+      64  | 7. QA hand-off | The human runs the app (`docker compose up`)
+           and checks ACs manually in CO and CL where relevant, with gree
+          n tests. | No | n/a | DoD checklist in CLAUDE.md ticked; sign-o
+          ff noted | **HC4.** `APPROVED` → ready for QA (merge). `REJECTE
+          D: <notes>` → back to implementer with notes. |
+      65 
+
+● Update(FLOW.md)
+  ⎿  Added 1 line
+      62  | 5. Review | The main session writes the commit list, changed
+          files and diff to `docs/reviews/US-XX.diff`. The reviewer reads
+           it, reviews against the spec, ADRs, CLAUDE.md, security and a1
+          1y, and logs every test-writer bug as a finding. Read-only; ret
+          urns a report that the main session saves. | Yes | Claude Code
+          main session (diff file) → `reviewer` subagent (opus, Read/Grep
+          /Glob only) | `docs/reviews/US-XX.diff`, `docs/reviews/REVIEW-U
+          S-XX.md` | **HC3.** Andres Beltran decides per finding: `fix no
+          w` / `accept risk (reason)` / `out of scope`, recorded in the r
+          eport. A finding that shows the spec is wrong goes to the spec
+          change loop (1b). |
+      63  | 6. Fixes | Implementer fixes the "fix now" findings (`fix(US-
+          XX): …`, `Refs: REVIEW-US-XX-FNN`); test-writer re-runs the sui
+          tes; the resolution commit is recorded per finding. | Yes | `im
+          plementer` (sonnet), `test-writer` (sonnet) | Fix commits; upda
+          ted review table | The human reviewed the selection at HC3; the
+           result is checked at HC4. |
+      64  | 7. QA hand-off | The human runs the app (`docker compose up`)
+           and checks ACs manually in CO and CL where relevant, with gree
+          n tests. | No | n/a | DoD checklist in CLAUDE.md ticked; sign-o
+          ff noted | **HC4.** `APPROVED` → ready for QA (merge). `REJECTE
+          D: <notes>` → back to implementer with notes. |
+      65 +| 8. Session logs | Export the session (`/export`) and copy the
+         + raw JSONL transcripts (main + subagents) from `~/.claude/proje
+         +cts/…` without editing; scan for secrets or personal data befor
+         +e committing. | No (manual copy) | n/a | `docs/ai-sessions/*.tx
+         +t`, `docs/ai-sessions/raw/**` | The human resolves any scan hit
+         + (the file is not committed and not edited). |                 
+      66 
+      67  ## Human checkpoints
+      68 
+
+● Update(FLOW.md)
+  ⎿  Added 15 lines, removed 1 line
+      73  | HC3 | Review report | Per finding: fix now / accept risk (wit
+          h reason) / out of scope | Selected findings go to implementer
+          |
+      74  | HC4 | Running app + green tests | ACs verified manually in bo
+          th countries where relevant | Back to implementer with notes |
+      75 
+      76 -Status gates in files: spec `status: Draft | Approved`; ADR `st
+         -atus: Proposed | Accepted | Superseded`. The implementer refuse
+         -s a spec that isn't `Approved`.                                
+      76 +Human approver: **Andres Beltran**.                            
+      77 
+      78 +## Status gates and the spec gate hook                         
+      79 +                                                               
+      80 +- Spec front matter `status: Draft | Approved` plus `version` a
+         +nd a Changelog. Any change after approval → `version + 1`, `sta
+         +tus: Draft`, HC1 again.                                        
+      81 +- ADR `status: Proposed | Accepted | Superseded`.              
+      82 +- The implementer refuses a spec that isn't `Approved`, and thi
+         +s is **enforced by a hook**, not only by instructions. `.claude
+         +/settings.json` runs [.claude/hooks/spec-gate.mjs](.claude/hook
+         +s/spec-gate.mjs) before every `Write`/`Edit`/`NotebookEdit`:   
+      83 +                                                               
+      84 +| Branch | Writes under `frontend/` or `cms/` |                
+      85 +|--------|------------------------------------|                
+      86 +| `feat/US-XX-<slug>` | allowed only if `docs/specs/SPEC-US-XX.
+         +md` has `status: Approved` |                                   
+      87 +| `chore/scaffold-<slug>` | allowed for infrastructure; blocked
+         + under `frontend/src/app/features/` |                          
+      88 +| `main`, detached HEAD, anything else | blocked |             
+      89 +                                                               
+      90 +Verified on 2026-11-23: 13 scripted cases plus a live blocked w
+         +rite on `main`. Limitation: `Bash` commands (generators, redire
+         +cts) aren't gated by the hook. CLAUDE.md restricts them to the 
+         +same branches, and the reviewer checks it.                     
+      91 +                                                               
+      92  ## Traceability
+      93 
+      94  `US-XX` → `SPEC-US-XX` (ACs `US-XX-AC-NN`) → `ADR-NNN` → commit
+          s (`feat(US-XX)`, `Refs: SPEC-US-XX, ADR-NNN`) → tests named `U
+          S-XX-AC-NN …` → `REVIEW-US-XX-FNN` with resolution commit. Conv
+          entions: [CLAUDE.md](CLAUDE.md#traceability-conventions).
+
+● Update(FLOW.md)
+  ⎿  Added 1 line, removed 1 line
+      91 
+      92  ## Traceability
+      93 
+      94 -`US-XX` → `SPEC-US-XX` (ACs `US-XX-AC-NN`) → `ADR-NNN` → commit
+         -s (`feat(US-XX)`, `Refs: SPEC-US-XX, ADR-NNN`) → tests named `U
+         -S-XX-AC-NN …` → `REVIEW-US-XX-FNN` with resolution commit. Conv
+         -entions: [CLAUDE.md](CLAUDE.md#traceability-conventions).      
+      94 +`US-XX` → `SPEC-US-XX` vN (ACs `US-XX-AC-NN`, Changelog) → `ADR
+         +-NNN` → commits (`feat(US-XX)`, `Refs: SPEC-US-XX, ADR-NNN`) → 
+         +tests named `US-XX-AC-NN …` → `US-XX.diff` → `REVIEW-US-XX-FNN`
+         + (including `TW-BUG`s) with resolution commit. Conventions: [CL
+         +AUDE.md](CLAUDE.md#traceability-conventions).                  
+      95 
+      96  ## Tool choice justification
+      97 
+
+● Update(FLOW.md)
+  ⎿  Added 1 line, removed 1 line
+      53 
+      54  | Step | Description | AI used? | AI, agent, subagent or skill
+          used | Deliverable produced | Human in the loop |
+      55  |------|-------------|----------|------------------------------
+          -----|----------------------|-------------------|
+      56 -| 0. Flow design | The human decides the flow, agents, checkpoi
+         -nts, gates and conventions (written in `docs/prompts/phase-0-pr
+         -ompt.md`). Claude Code drafts the context file, agents, skills 
+         -and templates from those decisions, and verifies Strapi/Angular
+         - facts against official docs. | Yes | Claude Code (Opus 5.5), m
+         -ain session; web-fetch helper for docs.strapi.io and angular.de
+         -v | `docs/prompts/phase-0-prompt.md`, `CLAUDE.md`, `.claude/age
+         -nts/*`, `.claude/skills/*`, `docs/adr/0000-template.md`, `docs/
+         -reviews/0000-template.md`, `docs/user-stories/*`, `FLOW.md`, `R
+         -EADME.md` | Human writes the decisions, reviews all generated f
+         -iles, and answers `APPROVED` / `REJECTED: <reason>`. On rejecti
+         -on, Claude Code revises. Commit only after approval. |         
+      56 +| 0. Flow design | The human decides the flow, agents, checkpoi
+         +nts, gates and conventions (written in `docs/prompts/phase-0-pr
+         +ompt.md`). Claude Code drafts the context file, agents, skills,
+         + templates and the spec-gate hook from those decisions, and ver
+         +ifies Strapi/Angular facts against official docs. | Yes | Claud
+         +e Code (Opus 5.5), main session; web-fetch helper for docs.stra
+         +pi.io and angular.dev | `docs/prompts/phase-0-prompt.md`, `CLAU
+         +DE.md`, `.claude/agents/*`, `.claude/skills/*`, `.claude/settin
+         +gs.json`, `.claude/hooks/spec-gate.mjs`, `docs/adr/0000-templat
+         +e.md`, `docs/reviews/0000-template.md`, `docs/user-stories/*`, 
+         +`FLOW.md`, `README.md` | Andres Beltran writes the decisions, r
+         +eviews all generated files, and answers `APPROVED` / `REJECTED:
+         + <reason>`. The first round was **REJECTED** with 6 changes (ho
+         +ok-enforced gate, spec versioning loop, test-writer bugs as fin
+         +dings, automated Strapi permissions + 403 test, raw transcript 
+         +logs, reviewer diff file); Claude Code applied them. Commit onl
+         +y after approval. |                                            
+      57  | 1. Spec | Turns the story into a verifiable spec: gaps with p
+          roposed resolutions, CO/CL matrix, Strapi data contract, Gherki
+          n ACs with IDs, test mapping, `version` + Changelog. | Yes | Cl
+          aude Code → `spec-writer` subagent (opus) + `spec-authoring` sk
+          ill (+ `strapi5-content-modeling`) | `docs/specs/SPEC-US-XX.md`
+           (`status: Draft`, `version: 1`) | **HC1.** Andres Beltran chec
+          ks that every AC is testable, gaps are resolved, and country be
+          havior is explicit. `APPROVED` → main session sets `status: App
+          roved`, `approved_by`, `approved_on` and records the approval i
+          n the Changelog. `REJECTED: <reason>` → spec-writer re-runs wit
+          h the reason. |
+      58  | 1b. Spec change (loop) | Any change to an approved spec (rais
+          ed by the human, an implementer blocker, a test-writer bug or a
+           review finding) bumps `version`, resets `status: Draft`, and a
+          dds a Changelog row with the ACs affected. The spec gate then r
+          e-locks that story's code. | Yes | `spec-writer` (opus) + `spec
+          -authoring` (versioning procedure) + `spec-gate` hook | Updated
+           `docs/specs/SPEC-US-XX.md` (`version: N+1`) | **HC1 again**, s
+          ame criteria. Code work on the story resumes only after `APPROV
+          ED`. |
+      59  | 2. Architecture decisions | Identifies decisions that need an
+           ADR (at minimum the multi-country strategy) and writes them wi
+          th ≥ 3 real alternatives and consequences; verifies framework f
+          acts on official docs. Skipped when no new decision is needed.
+          | Yes | Claude Code → `architect` subagent (opus) + Strapi/Angu
+          lar skills + WebFetch | `docs/adr/ADR-NNN-*.md` (`status: Propo
+          sed`) | **HC2.** The human checks for real alternatives, a just
+          ified choice and stated consequences. `APPROVED` → `status: Acc
+          epted`. `REJECTED: <reason>` → architect re-runs. |
+  ⎿  1 skill available
+
+● A quick consistency check for leftover references, plus a safer Mermaid syntax
+  for the dotted edges.
+
+● Bash(sed -i 's/IM -\. "spec wrong \/ blocker" \.-> CHG/IM -. spec wrong or
+      blocker .-> CHG/; s/HC3 -\. "finding needs spec change" \.-> CHG/HC3 -.
+      finding needs spec…)
+  ⎿  Created docs\ai-sessions\raw\.gitkeep
+  ⎿  Updated FLOW.md +3 -3
+      36      HC4 -- APPROVED --> QA(["Ready for QA"])
+      37 
+      38      %% Spec change loop: any change after approval
+      39 -    IM -. "spec wrong / blocker" .-> CHG                       
+      40 -    HC3 -. "finding needs spec change" .-> CHG                 
+      41 -    HC4 -. "spec change needed" .-> CHG                        
+      39 +    IM -. spec wrong or blocker .-> CHG                        
+      40 +    HC3 -. finding needs spec change .-> CHG                   
+      41 +    HC4 -. spec change needed .-> CHG                          
+      42      CHG["spec-writer: version+1,<br/>status: Draft, changelog r
+          ow<br/>(gate re-locks story code)"] --> HC1
+      43 
+      44      classDef human fill:#fde68a,stroke:#b45309,color:#000;
+
+● I've applied all six changes and answers. Nothing is committed. The spec gate
+  works: 13 scripted cases behaved as intended, and a live write to frontend/ on
+  main was blocked.
+
+  1. Spec gate hook
+  - What blocks: .claude/settings.json runs .claude/hooks/spec-gate.mjs before
+    every Write or Edit (Node; you have v24). It blocks writes under frontend/
+    or cms/ unless one of these is true:
+    - the branch is feat/US-XX-* and SPEC-US-XX.md has status: Approved;
+    - the branch is chore/scaffold-*.
+  - Everything else is blocked: main, detached HEAD, other branches, a missing
+    spec, or unreadable input.
+  - One rule I added: to make "infrastructure only" enforceable,
+    chore/scaffold-* branches also block writes under
+    frontend/src/app/features/.
+  - Limitation: the hook only sees file tools, not shell commands. ng new or a
+    shell redirect isn't gated. CLAUDE.md limits those to the same branches and
+    the reviewer checks it. This is documented in CLAUDE.md and FLOW.md.
+
+  2. Spec change loop
+  - Specs carry a version and a Changelog table. Any change after approval:
+    - bumps the version;
+    - sets status: Draft and clears the approval fields;
+    - logs the affected acceptance criteria.
+  - It then goes through HC1 again. Because the status is Draft, the hook
+    automatically locks that story's code until re-approval.
+  - Criterion IDs never change: removed ones are struck through, not reused.
+  - Updated in spec-writer, the spec-authoring skill (new versioning section),
+    CLAUDE.md, and the FLOW diagram (new loop from implementer, HC3 and HC4 back
+    to HC1).
+
+  3. Test-writer bugs
+  - The test-writer numbers its bugs TW-BUG-NN.
+  - The reviewer must log each one as a finding with source test-writer. It may
+    not drop any, even ones it thinks are wrong.
+  - The review template has a new Source column and a "Test-writer bugs" section
+    mapping each bug to its finding.
+
+  4. Strapi permissions
+  - The strapi5 skill now records the decision to set permissions in bootstrap:
+    one isolated function, an explicit allow-list, safe to re-run on every
+    start.
+  - The skill says plainly that this relies on undocumented internal Strapi
+    APIs, with a check to run on the live instance first.
+  - A test that a public POST/PUT/DELETE returns 403 is mandatory and part of
+    the Definition of Done.
+  - The architect now has this ADR as mandatory, and the test-writer has the 403
+    test.
+
+  5. Logs
+  - CLAUDE.md has the procedure: /export, then copy the raw JSONL transcripts
+    into docs/ai-sessions/raw/, then scan before committing.
+  - Subagent transcripts are saved: <session-id>/subagents/agent-<id>.jsonl
+    exists for the two doc-check agents I ran this session. We'll still verify
+    again after the first project subagent runs.
+
+  6. Reviewer input
+  - The main session writes the commits, changed files and diff to
+    docs/reviews/US-XX.diff (command in CLAUDE.md).
+  - The reviewer reads that file and stops if it's missing.
+  - Re-reviews use US-XX-r2.diff.
+
+  Your answers
+  - Angular 21: the conventions target v21 LTS, with explicit OnPush (the
+    default only arrives in v22).
+  - Approver name: "Andres Beltran" is now in CLAUDE.md and the spec, ADR and
+    review templates.
+  - FLOW.md: Step 0 records this rejection round as evidence of human
+    correction.
+
+  Fixed along the way: the earlier Angular skill said not to use withFetch().
+  That came from v22 docs. For v21 it's now marked to check when scaffolding.
+
+  Decision for you: your email is in the raw transcripts. This session's
+  transcript contains your email address 3 times (Claude Code adds it as session
+  context). Copying transcripts unedited into the repo would publish it, which
+  conflicts with the assessment's "no real personal data" rule. CLAUDE.md now
+  says to scan first, and on a hit to neither commit nor edit the file and ask
+  you. You still need to choose: keep the repo private, or accept leaving out
+  the affected raw files. This comes up at the first log copy, not now.
+
+  Waiting for your APPROVED. On approval I'll commit to main as chore(flow): set
+  up agentic flow (agents, skills, context, templates).
+
+> APPROVED.
+
+  On the email in raw transcripts: the repo stays private. When copying raw
+  logs, run the scan; files containing my email are NOT committed (not edited
+  either) and are listed by name in docs/ai-sessions/README.md as "excluded:
+  contains author's personal email". The /export files are scanned the same
+  way.
+
+  Commit to main and push.
+  ⎿  5 agent types available
+
+● Update(CLAUDE.md)
+  ⎿  Added 4 lines, removed 1 line
+      154       && cp -r "$SRC/<session-id>/subagents" "$DST/<session-id>
+           /"         # subagent transcripts + .meta.json
+      155     ```
+      156     Layout observed on 2026-11-23: the main transcript is `<ses
+           sion-id>.jsonl`; each subagent gets `<session-id>/subagents/ag
+           ent-<id>.jsonl` plus `agent-<id>.meta.json`. Find the session
+           ID by modification time (`ls -t "$SRC"/*.jsonl | head -1`). Su
+           bagent coverage is verified again after the first real subagen
+           t run.
+      157 -3. **Before committing, scan without editing:** `grep -rniE "a
+          -pi[_-]?key|token|secret|password|@gmail|@[a-z0-9-]+\.(com|co|c
+          -l)" docs/ai-sessions/`. If a hit is real (a secret or personal
+          - data), **don't commit that file and don't edit it**. Stop and
+          - ask the human.                                               
+      157 +3. **Before committing, scan both the `/export` files and the 
+          +raw files, without editing them:** `grep -rlniE "@gmail|@[a-z0
+          +-9-]+\.(com|co|cl)\b" docs/ai-sessions/` (emails), then `grep 
+          +-rniE "api[_-]?key|secret|password|token" docs/ai-sessions/` (
+          +review hits by hand).                                         
+      158 +   - A file containing the **author's personal email** is **no
+          +t committed and not edited**. Its name goes in [docs/ai-sessio
+          +ns/README.md](docs/ai-sessions/README.md) under "Excluded file
+          +s" with the reason `excluded: contains author's personal email
+          +`. The file stays local only.                                 
+      159 +   - Any other real hit (a secret, or someone else's personal 
+          +data): don't commit it, don't edit it, stop and ask the human.
+      160 +   - The repo is private. Exclusion still applies.            
+      161  4. Commit: `docs(sessions): add <phase-or-story> session logs`
+           .
+
+● Write(docs\ai-sessions\README.md)
+  ⎿  Wrote 17 lines to docs\ai-sessions\README.md
+      1 # AI session logs
+      2
+      3 Unedited logs of every working session with Claude Code (required
+         deliverable). The procedure is in [CLAUDE.md](../../CLAUDE.md#se
+        ssion-logs).
+      4
+      5 | Location | Contents |
+      6 |----------|----------|
+      7 | `YYYY-MM-DD-<phase-or-story>.txt` | `/export` of the main sessi
+        on, unedited |
+     … +10 lines (ctrl+o to expand)
+
+● Bash(rm docs/ai-sessions/.gitkeep && git remote -v && grep -rlF "afbb2690" .
+      --exclude-dir=.git; echo "email-check-exit=$?"; git add -A && git status
+      --short)
+  ⎿  Deleted docs\ai-sessions\.gitkeep
+
+● Your email is not in any staged file. Committing and pushing:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Phase 0 is committed to main as d9ee9ad and pushed to origin. I checked that
+  your email isn't in any committed file.
+
+  Before committing, I added your email rule:
+  - CLAUDE.md (CLAUDE.md#session-logs): both /export files and raw transcripts
+    are scanned. Any file with your email is neither edited nor committed; it's
+    listed by name instead.
+  - docs/ai-sessions/README.md: new file that holds that list under "Excluded
+    files", with the reason "excluded: contains author's personal email". It
+    replaced the folder's placeholder file.
+
+  This session's logs aren't in the repo yet. Run /export to finish Phase 0,
+  then I can copy and scan the files. This session's raw transcript contains
+  your email, so it will be excluded and listed. The two doc-check subagent
+  transcripts and the export will be scanned the same way.
+
+  Next is Phase 1: the spec-writer drafts SPEC-US-01, then US-02 and US-03,
+  stopping at HC1 for each.

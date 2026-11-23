@@ -14,4 +14,4 @@ Every file is scanned before committing. A file that contains the author's perso
 
 | File | Session date | Reason |
 |------|--------------|--------|
-| _none yet_ | | |
+| `raw/8b4e4e42-1745-4f6d-a20c-992313014171.jsonl` (Phase 0 main session, raw) | 2026-11-23 | excluded: contains author's personal email |
