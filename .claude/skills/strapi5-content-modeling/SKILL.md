@@ -44,7 +44,7 @@ Notes:
 - Attribute types: `string, text, richtext, enumeration, email, password, uid, date, time, datetime, timestamp, integer, biginteger, float, decimal, boolean, json, media, relation, customField, component, dynamiczone` (+ `locale`/`localizations` with i18n). **There is no `blocks` type in the schema reference; use `text` (or `richtext`).**
 - Relation: `{ "type": "relation", "relation": "manyToOne", "target": "api::country.country", "inversedBy": "plans" }`. The inverse side uses `mappedBy`. An inverse side without an owning side fails at boot.
 - Component attribute: `{ "type": "component", "component": "plan.coverage", "repeatable": true }`.
-- Enumeration: `{ "type": "enumeration", "enum": ["text","number","select","date","checkbox"] }`. **[unverified]** The docs list the type but don't show the `enum` key. Create one field in the admin Content-type Builder and copy the generated JSON.
+- Enumeration: `{ "type": "enumeration", "enum": ["text","number","select","date","checkbox"] }`. **Verified on Strapi 5.63 (Phase 2):** this exact shape works.
 
 Prefer creating types in the **admin Content-type Builder** (dev mode) and committing the generated files. That's less error-prone than hand-writing JSON.
 
@@ -73,6 +73,9 @@ Project rules:
   GET /api/countries?filters[code][$eq]=CO&populate[0]=copy
   GET /api/site-copy?populate[0]=copy
   ```
+- New projects generate `config/api.ts` with `strictParams: true` and `strictRelations: true` (verified 5.63): unknown query params are rejected, so the frontend must send only documented params.
+- **`status=draft` is honored for anonymous `find`** (verified 5.63): any Public `find` lets a caller read drafts with `?status=draft`. Draft & Publish hides drafts from the app's queries, not from a determined caller. Don't put secrets in drafts.
+- With curl, use `curl -g` so `[` `]` in query strings are not treated as glob ranges.
 - Bracket lists are capped at 100 items by default (`arrayLimit`); stay well below that.
 
 ## 5. Seeding (CO + CL, idempotent, part of `docker compose up`)
@@ -89,8 +92,9 @@ export default {
       filters: { code: 'CO' },
       pagination: { pageSize: 1 },   // pagination object, not a root pageSize
     });
-    if (existing.length > 0) return;  // idempotent: seed only an empty DB
-    // create countries, then fields and plans with status: 'published'
+    // Project practice (Phase 2): idempotent PER RECORD, not "skip if DB not empty":
+    // look up country by code, field by key+country, plan by name+country (findFirst),
+    // create only what is missing. A partial or evolved seed gets completed.
   },
 };
 ```
@@ -99,7 +103,7 @@ Document Service facts ([document-service](https://docs.strapi.io/cms/api/docume
 - `strapi.documents(uid).create({ data, status: 'published' })` creates **and publishes**. Without `status`, it creates a draft.
 - `strapi.documents(uid).publish({ documentId })` takes an object, not a bare ID.
 - **Reads default to `draft`** in the Document Service (the opposite of REST). Pass `status: 'published'` when you mean published.
-- Relations in `data`: pass the related `documentId` (e.g. `country: coDocumentId`). **[unverified]** Confirm the accepted relation input shape (`documentId` string vs `{ connect: [...] }`) on the Document Service / relations pages before writing the seed.
+- Relations in `data`: pass the related `documentId` as a bare string (e.g. `country: coDocumentId`). **Verified on 5.63**, also with `strictRelations: true`.
 - Document Service output is **not sanitized**. Don't return it from custom controllers without `strapi.contentAPI.sanitize.output`. Prefer the default controllers for the public API.
 
 Alternative: `strapi import -f <file>` restores an export, but it **deletes all existing data first**, needs identical schemas, and doesn't restore admin users or API tokens ([import](https://docs.strapi.io/cms/features/data-management/import), [export](https://docs.strapi.io/cms/features/data-management/export)). We prefer bootstrap seeding: the seed is readable JSON in git and the reset behavior is explicit.
@@ -107,6 +111,8 @@ Alternative: `strapi import -f <file>` restores an export, but it **deletes all 
 ## 6. Permissions: minimal Public role
 
 - All content types are **private by default**. The Public role exists by default and can't be deleted ([users-permissions](https://docs.strapi.io/cms/features/users-permissions), [REST](https://docs.strapi.io/cms/api/rest)).
+- Internal API (verified 5.63, undocumented): role = `strapi.db.query('plugin::users-permissions.role').findOne({ where: { type: 'public' } })`; grant = `strapi.db.query('plugin::users-permissions.permission').create({ data: { action: 'api::plan.plan.find', role: role.id } })`.
+- Anonymous write without permission returns **403** (verified 5.63 for POST, and PUT/DELETE on an existing documentId). PUT/DELETE on the bare collection path return 405 (no route), so denial tests must target a seeded documentId.
 - Grant the Public role **only `find`** (and `findOne` only if a spec needs single-entry reads) on: `country`, `form-field`, `plan`, `site-copy` (ADR-003: `find` only, no `findOne`). Nothing else: no `create`/`update`/`delete`, no upload, no users-permissions endpoints beyond defaults.
 - Justification to record in the ADR/README: the app is anonymous and read-only; the quote and payment are simulated client-side, so no write endpoint is ever needed.
 ### Project decision: permissions are set automatically in `bootstrap`
