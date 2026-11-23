@@ -144,7 +144,7 @@ Refs: SPEC-US-01, ADR-001
 These unedited logs are a required deliverable. At the end of every working session:
 
 1. **Readable export:** run `/export` and save it as `docs/ai-sessions/YYYY-MM-DD-<phase-or-story>.txt`. Don't edit it.
-2. **Raw transcripts:** copy the session's raw JSONL files, including subagents, unchanged:
+2. **Raw transcripts (local only):** copy the session's raw JSONL files, including subagents, unchanged. **Raw transcripts are excluded from the repo: they contain the author's account email, which Claude Code injects into every session; the `/export` files are the committed unedited logs.** `docs/ai-sessions/raw/**/*.jsonl` is gitignored (standing decision, Andres Beltran, 2026-11-23). The `.meta.json` files are committed only if the email scan is clean.
    ```bash
    SRC=~/.claude/projects/c--Proyectos-car-insurance-project
    DST=docs/ai-sessions/raw

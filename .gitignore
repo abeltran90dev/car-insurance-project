@@ -24,3 +24,6 @@ Thumbs.db
 
 # Claude Code local settings (personal)
 .claude/settings.local.json
+
+# Raw Claude Code transcripts: contain the author account email (see docs/ai-sessions/README.md)
+docs/ai-sessions/raw/**/*.jsonl
