@@ -1,0 +1,14 @@
+{
+  "collectionName": "components_form_validation_rules",
+  "info": { "displayName": "Validation rule", "description": "Named validator with optional parameter and message" },
+  "options": {},
+  "attributes": {
+    "type": {
+      "type": "enumeration",
+      "enum": ["required", "minLength", "maxLength", "min", "max", "pattern", "minAge", "vehicleYear", "rut", "colombianId"],
+      "required": true
+    },
+    "value": { "type": "string" },
+    "message": { "type": "string" }
+  }
+}
