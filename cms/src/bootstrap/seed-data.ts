@@ -218,47 +218,40 @@ const CL_FIELDS: SeedField[] = [
   { key: 'draftOnlyField', label: 'Campo en borrador', type: 'text', required: false, order: 99, group: 'vehicle', draftOnly: true },
 ];
 
-const buildPlans = (p: [number, number, number, number, number]): SeedPlan[] => [
-  {
-    name: 'Plan Básico', shortDescription: 'Protección esencial para tu vehículo.', basePrice: p[0], order: 1,
-    recommended: false, active: true,
-    coverages: [{ title: 'Responsabilidad civil', description: 'Daños a terceros.' }],
-    benefits: [{ title: 'Asistencia en carretera' }],
-  },
-  {
-    name: 'Plan Estándar', shortDescription: 'Cobertura completa para tu día a día.', basePrice: p[1], order: 2,
-    recommended: true, active: true,
-    coverages: [
-      { title: 'Responsabilidad civil', description: 'Daños a terceros.' },
-      { title: 'Pérdida total', description: 'Por daño o robo.' },
-    ],
-    benefits: [{ title: 'Grúa 24/7' }, { title: 'Vehículo de reemplazo', description: 'Hasta 7 días.' }],
-  },
-  {
-    name: 'Plan Premium', shortDescription: 'La máxima protección sin preocupaciones.', basePrice: p[2], order: 3,
-    recommended: false, active: true,
-    coverages: [
-      { title: 'Responsabilidad civil', description: 'Daños a terceros.' },
-      { title: 'Pérdida total', description: 'Por daño o robo.' },
-      { title: 'Daños parciales', description: 'Sin deducible.' },
-    ],
-    benefits: [
-      { title: 'Grúa 24/7' },
-      { title: 'Vehículo de reemplazo', description: 'Hasta 15 días.' },
-      { title: 'Conductor elegido' },
-    ],
-  },
-  {
-    name: 'Plan Legado', shortDescription: 'Plan descontinuado (inactivo).', basePrice: p[3], order: 4,
-    recommended: false, active: false,
-    coverages: [{ title: 'Responsabilidad civil' }], benefits: [],
-  },
-  {
-    name: 'Plan Borrador', shortDescription: 'Plan en preparación (sin publicar).', basePrice: p[4], order: 5,
-    recommended: false, active: true, draftOnly: true,
-    coverages: [{ title: 'Responsabilidad civil' }], benefits: [],
-  },
-];
+interface PlanSet {
+  names: [string, string, string];
+  prices: [number, number, number];
+  coverages: [string, string, string];
+  benefits: [string, string];
+}
+
+// Plan seed per SPEC-US-02 section 3. Legacy plan is published but inactive; draft plan is never published.
+const buildPlans = (s: PlanSet): SeedPlan[] => {
+  const cov = (n: number) => s.coverages.slice(0, n).map((title) => ({ title }));
+  const ben = (n: number) => s.benefits.slice(0, n).map((title) => ({ title }));
+  return [
+    {
+      name: s.names[0], shortDescription: 'Protección esencial para tu vehículo.', basePrice: s.prices[0], order: 1,
+      recommended: false, active: true, coverages: cov(1), benefits: ben(1),
+    },
+    {
+      name: s.names[1], shortDescription: 'Cobertura completa para tu día a día.', basePrice: s.prices[1], order: 2,
+      recommended: true, active: true, coverages: cov(2), benefits: ben(2),
+    },
+    {
+      name: s.names[2], shortDescription: 'La máxima protección sin preocupaciones.', basePrice: s.prices[2], order: 3,
+      recommended: false, active: true, coverages: cov(3), benefits: ben(2),
+    },
+    {
+      name: 'Plan Antiguo', shortDescription: 'Plan descontinuado (inactivo).', basePrice: s.prices[0], order: 4,
+      recommended: false, active: false, coverages: cov(1), benefits: [],
+    },
+    {
+      name: 'Plan Borrador', shortDescription: 'Plan en preparación (sin publicar).', basePrice: s.prices[2], order: 5,
+      recommended: false, active: true, draftOnly: true, coverages: cov(1), benefits: [],
+    },
+  ];
+};
 
 const TERMS =
   '1. Este es un texto de ejemplo.\n2. La cotización es simulada y no constituye una póliza.\n3. No se realiza ningún cobro real.';
@@ -268,12 +261,12 @@ export const COUNTRIES: SeedCountry[] = [
     code: 'CO', name: 'Colombia', numberLocale: 'es-CO', currency: 'COP', legalAge: 18,
     termsTitle: 'Términos y condiciones – Colombia', termsBody: TERMS,
     fields: CO_FIELDS,
-    plans: buildPlans([890000, 1250000, 1890000, 700000, 2500000]),
+    plans: buildPlans({ names: ['Plan Básico', 'Plan Estándar', 'Plan Premium'], prices: [850000, 1250000, 1900000], coverages: ['Responsabilidad civil', 'Pérdida total por daños', 'Hurto'], benefits: ['Grúa 24/7', 'Vehículo de reemplazo'] }),
   },
   {
     code: 'CL', name: 'Chile', numberLocale: 'es-CL', currency: 'CLP', legalAge: 18,
     termsTitle: 'Términos y condiciones – Chile', termsBody: TERMS,
     fields: CL_FIELDS,
-    plans: buildPlans([320000, 480000, 720000, 250000, 900000]),
+    plans: buildPlans({ names: ['Plan Esencial', 'Plan Full', 'Plan Full Plus'], prices: [259990, 389990, 549990], coverages: ['Responsabilidad civil', 'Daños propios', 'Robo'], benefits: ['Asistencia en ruta', 'Auto de reemplazo'] }),
   },
 ];

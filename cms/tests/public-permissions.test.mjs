@@ -85,7 +85,7 @@ for (const cc of COUNTRIES) {
     );
     const names = body.data.map((p) => p.name);
     assert.equal(body.data.length, 3, `expected 3 active published plans, got ${names.join(', ')}`);
-    assert.ok(!names.includes('Plan Legado'), 'inactive plan leaked');
+    assert.ok(!names.includes('Plan Antiguo'), 'inactive plan leaked');
     assert.ok(!names.includes('Plan Borrador'), 'draft plan leaked');
     assert.equal(body.data.filter((p) => p.recommended).length, 1);
   });
