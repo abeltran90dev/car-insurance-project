@@ -107,7 +107,9 @@ TODO
 
 ## What did not work as expected and how we adjusted it
 
-TODO
+- **SPEC-US-01 blocked by a safety classifier (2026-11-23, Phase 1).** Two separate `spec-writer` runs for US-01 were stopped mid-write by a safety classifier, and no file was produced. The second run had stricter content rules: validators described by behavior only, clearly fake examples only. The likely trigger is the national-ID validator content (Chilean RUT check digit, Colombian ID format), even with fictitious data. The main session did not retry a third time or try to work around the block, and escalated to the human. **Adjustment:** Andres Beltran drafted SPEC-US-01 outside Claude Code, in his planning chat on Claude.ai (its log is in `docs/ai-sessions/`), and reviewed the draft himself. Inside Claude Code, `spec-writer` then only reviews and completes it: remaining gaps, P1/P2 tags, format against the `spec-authoring` skill, and consistency with SPEC-US-02/03 (`vehicleYear` field identification, 10 s timeout, `maskInSummary`). It then goes through HC1 as usual.
+
+TODO (remaining items at project end)
 
 ## Where AI was deliberately not used, and why
 

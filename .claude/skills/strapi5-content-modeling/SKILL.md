@@ -21,10 +21,12 @@ Every API fact here was checked against docs.strapi.io on 2026-11-23 (latest rel
 
 | Content | Kind | Key attributes | Why |
 |---------|------|----------------|-----|
-| `country` | collection type | `code` (string, `CO`/`CL`), `name`, `currency` (`COP`/`CLP`), `numberLocale` (`es-CO`/`es-CL`), `legalAge` (integer), `termsTitle` (string), `termsBody` (text) | One place for everything country-level. Other types relate to it. |
-| `form-field` | collection type | `key` (string, stable machine name), `label`, `type` (enumeration: `text`,`number`,`select`,`date`,`checkbox`), `required` (boolean), `helpText`, `errorMessage`, `order` (integer), `group` (enumeration: `policyholder`,`vehicle`), `options` (component `form.option`, repeatable), `validation` (component `form.validation`), `country` (relation manyToOne → country) | The business team adds, removes and reorders fields; the frontend renders whatever is published. |
+| `country` | collection type | `code` (string, `CO`/`CL`), `name`, `currency` (`COP`/`CLP`), `numberLocale` (`es-CO`/`es-CL`), `legalAge` (integer), `termsTitle` (string), `termsBody` (text), `copy` (component `shared.copy-entry`, repeatable) | One place for everything country-level. Other types relate to it. |
+| `form-field` | collection type | `key` (string, stable machine name), `label`, `type` (enumeration: `text`,`number`,`select`,`date`,`checkbox`), `required` (boolean), `helpText`, `errorMessage`, `order` (integer), `group` (enumeration: `policyholder`,`vehicle`), `maskInSummary` (boolean), `options` (component `form.option`, repeatable), `validations` (component `form.validation-rule`, repeatable), `country` (relation manyToOne → country) | The business team adds, removes and reorders fields; the frontend renders whatever is published. |
 | `form.option` | component | `value` (string), `label` (string), `order` (integer) | Select options from Strapi (make, city). |
-| `form.validation` | component | `min`, `max` (decimal), `minLength`, `maxLength` (integer), `pattern` (string), `rule` (enumeration of named validators, e.g. `none`,`co-document`,`cl-rut`,`vehicle-year`,`legal-age`) | Simple rules are data; complex ones (RUT check digit, age) are **named validators in code that Strapi selects**. |
+| `form.validation-rule` | component (repeatable) | `type` (enumeration: `required`,`minLength`,`maxLength`,`min`,`max`,`pattern`,`minAge`,`vehicleYear`,`rut`,`colombianId`), `value` (string; the frontend converts to number where needed), `message` (string) | ADR-001. Simple rules are data; complex ones (RUT check digit, age) are **named validators in code that Strapi selects**. |
+| `shared.copy-entry` | component (repeatable) | `key` (string, `<area>.<camelCaseName>`, e.g. `common.retry`), `value` (text) | ADR-001. Per-country UI copy on `country.copy`. |
+| `site-copy` | single type | `copy` (component `shared.copy-entry`, repeatable) | ADR-001. Country-independent copy (`picker.*`, `notFound.*`). |
 | `plan` | collection type | `name`, `shortDescription`, `basePrice` (decimal), `currency`, `order` (integer), `recommended` (boolean), `active` (boolean), `coverages` (component `plan.coverage`, repeatable), `benefits` (component `plan.benefit`, repeatable), `country` (relation manyToOne → country) | Matches the US-02 business rules exactly. |
 | `plan.coverage` / `plan.benefit` | components | `title`, `description` (and `amount` for coverage, if the spec asks) | Only exist inside a plan. |
 
@@ -56,7 +58,7 @@ Responses are **flattened** in Strapi 5: `data[0].name`, not `data[0].attributes
 | Filter by country (through relation) | `filters[country][code][$eq]=CO` | [filters](https://docs.strapi.io/cms/api/rest/filters) |
 | Filter boolean | `filters[active][$eq]=true` (accepts `true/t/1`, `false/f/0`; other values → 400) | [filters](https://docs.strapi.io/cms/api/rest/filters) |
 | Operators | `$eq $eqi $ne $nei $lt $lte $gt $gte $in $notIn $contains $notContains $containsi $notContainsi $null $notNull $between $startsWith(i) $endsWith(i) $or $and $not` | [filters](https://docs.strapi.io/cms/api/rest/filters) |
-| Populate components/relations | Nothing is populated by default. `populate[0]=options&populate[1]=validation`. Nested: `populate[coverages][populate][0]=<nested>` | [populate](https://docs.strapi.io/cms/api/rest/populate-select) |
+| Populate components/relations | Nothing is populated by default. `populate[0]=options&populate[1]=validations`. Nested: `populate[coverages][populate][0]=<nested>` | [populate](https://docs.strapi.io/cms/api/rest/populate-select) |
 | Sort | `sort=order:asc`; multiple: `sort[0]=order:asc&sort[1]=name:asc` | [sort-pagination](https://docs.strapi.io/cms/api/rest/sort-pagination) |
 | Page size | default 25 (`pagination[pageSize]`). Set `pagination[pageSize]=100` explicitly; new projects generate `rest.maxLimit: 100` in `config/api` | [sort-pagination](https://docs.strapi.io/cms/api/rest/sort-pagination), [api config](https://docs.strapi.io/cms/configurations/api) |
 
@@ -66,9 +68,10 @@ Project rules:
 - Each populated **relation** target needs `find` permission on the Public role. Components need nothing extra.
 - Canonical requests:
   ```
-  GET /api/form-fields?filters[country][code][$eq]=CO&sort=order:asc&populate[0]=options&populate[1]=validation&pagination[pageSize]=100
-  GET /api/plans?filters[country][code][$eq]=CO&filters[active][$eq]=true&sort=order:asc&populate[0]=coverages&populate[1]=benefits&pagination[pageSize]=100
-  GET /api/countries?filters[code][$eq]=CO
+  GET /api/form-fields?filters[country][code][$eq]=CO&sort[0]=order:asc&sort[1]=key:asc&populate[0]=options&populate[1]=validations&pagination[pageSize]=100
+  GET /api/plans?filters[country][code][$eq]=CO&filters[active][$eq]=true&sort[0]=order:asc&sort[1]=name:asc&populate[0]=coverages&populate[1]=benefits&pagination[pageSize]=100
+  GET /api/countries?filters[code][$eq]=CO&populate[0]=copy
+  GET /api/site-copy?populate[0]=copy
   ```
 - Bracket lists are capped at 100 items by default (`arrayLimit`); stay well below that.
 
@@ -104,7 +107,7 @@ Alternative: `strapi import -f <file>` restores an export, but it **deletes all 
 ## 6. Permissions: minimal Public role
 
 - All content types are **private by default**. The Public role exists by default and can't be deleted ([users-permissions](https://docs.strapi.io/cms/features/users-permissions), [REST](https://docs.strapi.io/cms/api/rest)).
-- Grant the Public role **only `find`** (and `findOne` only if a spec needs single-entry reads) on: `country`, `form-field`, `plan`. Nothing else: no `create`/`update`/`delete`, no upload, no users-permissions endpoints beyond defaults.
+- Grant the Public role **only `find`** (and `findOne` only if a spec needs single-entry reads) on: `country`, `form-field`, `plan`, `site-copy` (ADR-003: `find` only, no `findOne`). Nothing else: no `create`/`update`/`delete`, no upload, no users-permissions endpoints beyond defaults.
 - Justification to record in the ADR/README: the app is anonymous and read-only; the quote and payment are simulated client-side, so no write endpoint is ever needed.
 ### Project decision: permissions are set automatically in `bootstrap`
 
@@ -113,10 +116,10 @@ So that `docker compose up` stays one command with no clicks in the admin panel,
 - The docs only describe the admin UI (Settings → Users & Permissions → Roles → Public). **Setting permissions in code is not documented.** It's commonly done by querying the internal `plugin::users-permissions.role` (type `public`) and creating rows in `plugin::users-permissions.permission` with action strings like `api::plan.plan.find`. That's an **[unverified] internal API** that may change between versions. Before writing it, check the model UIDs and the action format against the running instance (create one permission in the admin panel, then read it back with `strapi.db.query`).
 - Implementation rules:
   1. One isolated function, `grantPublicReadPermissions(strapi)` in `cms/src/bootstrap/permissions.ts`, called from `bootstrap`.
-  2. An **explicit allow-list** constant (e.g. `['api::country.country.find', 'api::form-field.form-field.find', 'api::plan.plan.find']`), never a pattern or a loop over all content types.
-  3. Idempotent: create only missing permissions. It never grants anything outside the list. It logs what it granted.
+  2. An **explicit allow-list** constant (e.g. `['api::country.country.find', 'api::form-field.form-field.find', 'api::plan.plan.find', 'api::site-copy.site-copy.find']`), never a pattern or a loop over all content types.
+  3. Idempotent: create only missing permissions. It never grants anything outside the list. It logs what it granted, and warns (never revokes) about public permissions outside the list (ADR-003).
   4. It runs on every start, so a fresh container is always correct.
-- **Mandatory test:** an automated test proves that an anonymous write is refused: `POST /api/plans` (and `PUT`/`DELETE` on an existing `documentId`, for each content type the app reads) returns **403**. The test-writer adds it to the first story that touches Strapi. A positive check (`GET /api/plans` returns 200) proves the grant worked.
+- **Mandatory test:** an automated test proves that an anonymous write is refused: `POST /api/plans` (and `PUT`/`DELETE` on an existing `documentId`, for each content type the app reads) is denied with **401 or 403** (ADR-003, decided at HC2). The test-writer adds it to the first story that touches Strapi. A positive check (`GET /api/plans` returns 200) proves the grant worked.
 - After a Strapi upgrade, the 403 test and a GET smoke test must pass before merging.
 
 ## 7. Tokens, secrets, CORS

@@ -32,7 +32,7 @@ Checked against angular.dev on 2026-11-23. The site was at **v22.3**; v22 is the
 
 - Local and shared state uses `signal`, `computed` and `linkedSignal` ([signals](https://angular.dev/guide/signals), [linked-signal](https://angular.dev/guide/signals/linked-signal)). Use `effect` only for side effects that leave Angular (e.g. writing to `sessionStorage`), never to copy one signal into another.
 - Wizard state lives in **one root service** (`QuoteStore`) exposing readonly signals plus intent methods (`setApplicant()`, `selectPlan()`, `reset()`). Components never mutate store internals.
-- Persistence: the store writes a versioned snapshot (`{ v: 1, country, values, planId, step }`) to `sessionStorage` from one `effect` and rehydrates on init. Drop the snapshot if its version or country doesn't match. The spec decides the exact fields.
+- Persistence: the store writes a versioned snapshot (`{ v: 1, country, values, planDocumentId }` under key `quote:v1:{CC}`, per ADR-004) to `sessionStorage` from one `effect` and rehydrates on init. Drop the snapshot if its version or country doesn't match. The spec decides the exact fields.
 - RxJS only where it's natural (router events, HTTP internals). Convert to signals at the boundary.
 
 ## 4. Data loading and the loading/error pattern
@@ -55,13 +55,13 @@ Checked against angular.dev on 2026-11-23. The site was at **v22.3**; v22 is the
 ## 5. Forms: typed reactive forms built from Strapi
 
 - Use **typed reactive forms**: `FormGroup<T>`, `FormControl<T>`, `NonNullableFormBuilder` / `fb.nonNullable` ([typed-forms](https://angular.dev/guide/forms/typed-forms)). No `Untyped*`.
-- The step 1 form is **generated at runtime** from `FormFieldConfig[]`: one control per field `key`. Validators come from a pure `buildValidators(config)` function: `required`, `min`/`max`, `minLength`/`maxLength`, `pattern`, plus **named validators** selected by `validation.rule` (`cl-rut`, `co-document`, `vehicle-year`, `legal-age`). Each validator returns an error key, and the error **message is the field's Strapi `errorMessage`**.
+- The step 1 form is **generated at runtime** from `FormFieldConfig[]`: one control per field `key`. Validators come from a pure `buildValidators(config)` function: `required`, `min`/`max`, `minLength`/`maxLength`, `pattern`, plus **named validators** selected by the `type` of each entry in the field's `validations` list (`minAge`, `vehicleYear`, `rut`, `colombianId`; ADR-001). Each validator returns an error key, and the error **message is that rule's Strapi `message`** (country fallback if missing; SPEC-US-01). Unknown `type` → ignored with a console warning.
 - Field components are chosen with `@switch (field.type)`, one small component per type.
 - Signal Forms (`@angular/forms/signals`, `form()`, `FormField`) exist from v21 ([signal forms](https://angular.dev/guide/forms/signals/overview)). We **don't** use them unless an ADR decides otherwise: their stability label wasn't confirmed, and typed reactive forms are the stated requirement.
 
 ## 6. Routing and structure
 
-- Routes: `/:country/datos`, `/:country/planes`, `/:country/resumen`, `/:country/confirmacion` (the final shape comes from ADR-001). Lazy-load with `loadComponent` (**[unverified]**, see [loading-strategies](https://angular.dev/guide/routing/loading-strategies)).
+- Routes: `/:country/datos`, `/:country/planes`, `/:country/resumen`, `/:country/confirmacion` (decided in ADR-002: async `canMatch` resolves the code against Strapi; an unknown code renders not-found in place, keeping the URL). Lazy-load with `loadComponent` (**[unverified]**, see [loading-strategies](https://angular.dev/guide/routing/loading-strategies)).
 - Read route params as inputs with `withComponentInputBinding()` ([read-route-state](https://angular.dev/guide/routing/read-route-state)).
 - Step guards are functional `CanActivateFn` that return a `UrlTree` (redirect to the first incomplete step), not `false` + navigate ([route-guards](https://angular.dev/guide/routing/route-guards)).
 - **Folders by feature, not by type** (no `components/`, `services/` folders). File names have no type suffix: `plan-list.ts`, `plan-list.html`, `plan-list.spec.ts` ([style guide](https://angular.dev/style-guide)).
