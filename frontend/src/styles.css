@@ -1,0 +1,147 @@
+:root {
+  --color-text: #1b1f24;
+  --color-muted: #4a5360;
+  --color-bg: #ffffff;
+  --color-surface: #f3f5f8;
+  --color-primary: #0b5cad;
+  --color-primary-text: #ffffff;
+  --color-focus: #b34700;
+  --space: 1rem;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+h1:focus {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.nav-pending {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0;
+}
+
+.nav-pending--active {
+  opacity: 1;
+  transform: scaleX(1);
+  transition: transform 1.5s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-pending--active {
+    transition: none;
+  }
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  min-height: 3.5rem;
+  padding: 0 var(--space);
+  background: var(--color-surface);
+  border-bottom: 1px solid #d5dae1;
+}
+
+.site-header__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.site-main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: var(--space);
+}
+
+.page {
+  display: grid;
+  gap: var(--space);
+}
+
+.steps {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0 0 var(--space);
+  padding: 0;
+  list-style: none;
+}
+
+.steps__item {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 44px;
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  border: 2px solid transparent;
+}
+
+.steps__item[aria-current='step'] {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.country-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 1.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+@media (min-width: 600px) {
+  .country-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
