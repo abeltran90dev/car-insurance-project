@@ -1,0 +1,959 @@
+
+> /clear
+
+> <ide_opened_file>The user opened the file
+  c:\Proyectos\car-insurance-project\docs\ai-sessions\2026-11-23-phase-1.txt in
+  the IDE. This may or may not be related to the current
+  task.</ide_opened_file>
+
+> Read docs/prompts/phase-2-prompt.md and execute it. Where it differs from the
+  accepted ADRs (e.g. findOne, site-copy, 401/403), the ADRs prevail. Seed
+  must also include one draft form field per country (SPEC-US-01 AC-05).
+  Deadline 23:59: minimal and working, P1 only.
+
+  Read 1 file, listed 2 directories, ran 2 shell commands (ctrl+o to expand)
+
+● I'm on chore/scaffold-infra and have read the ADRs. Next I'll hand the
+  scaffold to two implementer subagents running in parallel, one for cms/ and
+  Docker and one for the Angular shell.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Skills are already aligned with ADR-001 and ADR-003. Starting both
+  implementers now.
+
+● 2 background agents launched (↓ to manage)
+   ├ Scaffold Strapi cms and Docker
+   └ Scaffold Angular shell frontend
+
+● Both implementers are running in the background on chore/scaffold-infra: one
+  is building the Strapi side plus Docker, the other the Angular shell. When
+  both finish, I'll do the full clean-state verification (docker compose down -v
+  then up --build) myself and bring you the evidence for the checkpoint.
+
+› Message from implementer
+  Frontend scaffold is committed on `chore/scaffold-infra` (3 commits, only
+  `frontend/` paths). `npm run build` and `npm test` are green. The Docker image
+  and Playwright against the real Strapi stack were not run: Strapi was not up
+  on :1337.
+
+  **Commits**
+  - `ad7097f` chore(scaffold): generate Angular 21 app with country shell,
+  Strapi client and QuoteStore
+  - `cb68d7b` chore(scaffold): add frontend Dockerfile and nginx config with
+  /api proxy
+  - `8d52fbf` chore(scaffold): add Playwright config and country picker smoke
+  test
+
+  All three end with `Co-Authored-By: Claude Opus 5.5` as you asked. This
+  differs from the attribution in my own system reminder, which names Sonnet
+  5.5.
+
+  **Test runner and versions**
+  - Test runner is **Vitest** (`@angular/build:unit-test`, vitest 4.1.12,
+  jsdom). Angular is 21.2.x and the CLI generated a zoneless app (no zone.js).
+  - `package.json` scripts: `test` = `ng test --no-watch`, `e2e` = `playwright
+  test`.
+
+  **Build and test output**
+  - `npm run build`: complete, no warnings. Initial total is 266 kB raw / 75.5
+  kB transfer, and picker, shell, placeholder and not-found are lazy chunks.
+  - `npm test`: 2 files, 3 tests passed (the adjusted `App` shell spec and a
+  `country-config` spec for the mapper and `copy()` warning).
+  - E2E: I ran `ng serve` against a throwaway mock of `/api` (not committed,
+  killed afterwards). The committed smoke test `scaffold: country picker loads`
+  passed, and so did a temporary flow test that I deleted. The flow covered:
+    - picker links work;
+    - `/<code>` redirects to `/datos`;
+    - the step indicator has exactly one `aria-current="step"`;
+    - an upper-case segment redirects to lower case;
+    - `/zz/datos` shows not-found and keeps the URL;
+    - `/bb/foo` shows not-found.
+  - The mock showed `/zz/datos` firing only the country lookup, no other
+  request.
+
+  **`src/app` file tree**
+  ```
+  app.config.ts  app.routes.ts  app.ts  app.spec.ts
+  core/    country-config.ts (+spec)  country-context.ts  country-match-guard.ts
+           quote-store.ts  site-copy.ts  strapi-client.ts
+  shared/  country-picker.ts  country-shell.ts  not-found.ts
+           step-indicator.ts  step-placeholder.ts  steps.ts
+  ```
+
+  **Other files**
+  - `frontend/proxy.conf.json` is wired into `serve.options` in `angular.json`.
+  - `frontend/Dockerfile` is node 22 build then nginx:alpine, built from
+  `dist/frontend/browser`. `frontend/nginx.conf` listens on 80, proxies `/api/`
+  to `http://cms:1337` and falls back to `index.html`. `.dockerignore` is added.
+  - `frontend/playwright.config.ts` has `baseURL` from `E2E_BASE_URL` (default
+  `http://localhost:4200`), and the smoke test is `frontend/e2e/smoke.spec.ts`.
+  Chromium is installed via `npx playwright install chromium`.
+
+  **Choices where the ADRs leave room**
+  - `countryMatchGuard` follows ADR-002: regex `^[a-z]{2}$`, an upper-case
+  segment redirects to lower case, zero results returns false, and an error
+  returns true. It also calls `QuoteStore.activate(code)` when the country is
+  found.
+  - `CountryContext.current` is set to null on not-found or error, so a stale
+  country never shows.
+  - `:country` has a parent layout component, `CountryShell`, holding the step
+  indicator. This is not in the ADR-002 diagram but does not change the routes.
+  - The step indicator shows numbers only. The specs and ADR-001 define no
+  step-label copy keys, so I left labels out rather than invent keys. If you
+  want labels, the spec-writer must add keys such as `common.step.*`.
+  - The shared placeholder's `<h1>` shows the country name and the route word,
+  which is placeholder text only.
+  - `SiteCopy.text()` and the fallbacks cover loading, error, retry and
+  not-found when Strapi is unreachable. The fallback strings are in
+  `FALLBACK_COPY` in `core/site-copy.ts`, and there is a minimal technical
+  Spanish `<title>`.
+  - `QuoteStore` stores no prices, config or acceptance. It removes the entry
+  when values are empty and the plan is null, and falls back to memory with one
+  `console.warn` if storage throws.
+  - `provideHttpClient(withFetch())` is registered.
+  - The app has no `co`/`cl` literals, no `innerHTML`, no `localStorage` and no
+  NgModules.
+
+  **Deviations from the ADRs:** none.
+
+  **Notes for the CMS implementer and docs**
+  - The seed must include the `site-copy` keys the picker and not-found use:
+  `picker.title`, `picker.intro`, `picker.loading`, `picker.error`,
+  `notFound.title`, `notFound.message`, `notFound.backToPicker` and
+  `common.retry`. Without them the picker heading is blank and a `console.warn`
+  fires.
+  - The skill's "avoid heavy inline heredocs" gotcha: a long bash heredoc batch
+  silently failed on this Windows shell, so I wrote the files with the Write
+  tool.
+  - My first attempt to kill processes by port was denied by the permission
+  classifier. It could have hit the other implementer's Strapi on 1337, so I
+  killed only my own processes by command line.
+
+  **`angular-conventions` skill: wrong or imprecise for v21**
+  1. §4 line 40 says "**[unverified] for v21**: on v21, register
+  `provideHttpClient(withFetch())`". Correct fact: `withFetch()` exists and
+  compiles in 21.2, and I registered it. Whether fetch is the v21 default I did
+  not verify. Keep `withFetch()`.
+  2. §6 line 64 and §1 line 13 are fine. Zoneless is the generated default in
+  v21, and OnPush is not the default, so it must stay explicit.
+  3. `Router.getCurrentNavigation()` is older API. In v21
+  `router.currentNavigation()` (a signal) works, and I used it in the guard. The
+  skill does not mention it.
+  4. §4 says use `httpResource()`. I used `rxResource({ stream })` from
+  `@angular/core/rxjs-interop` instead, because I needed the 10 s `timeout`
+  operator and `httpResource` has no timeout option. It still gives
+  `isLoading()`, `error()`, `hasValue()` and `reload()`. The skill should note
+  this exception.
+  5. §3 says "a **QuoteStore** ... one `effect`". That works, but the effect
+  runs lazily, so any test that reads `sessionStorage` must flush it (for
+  example `TestBed.tick()` or `flushEffects`).
+  6. §6 says step guards return a `UrlTree`. `inject()` must be called before
+  any `await` in a functional guard, otherwise the injection context is lost. I
+  hit this and fixed it. The skill should say so.
+
+● The frontend shell is done: three commits, and npm run build and the unit
+  tests pass (Vitest, Angular 21.2, zoneless by default). Its Playwright smoke
+  test only ran against a temporary fake /api, not real Strapi. I'm waiting on
+  the CMS and Docker implementer before verifying the whole stack. Once both are
+  in, I'll also fix the angular-conventions skill points it found wrong.
+
+● Agent "Scaffold Angular shell frontend" finished · 8m 44s
+
+› Message from implementer
+  CMS scaffold is done and verified in Docker on `chore/scaffold-infra`. I only
+  built and ran `cms`; the `frontend` service in the compose file is untouched
+  by me and was not built or started. Gate check passed (SPEC-US-01..03
+  Approved, ADR-001..005 Accepted). I did not touch `frontend/`, and nothing is
+  pushed.
+
+  **Commits** (all with `Co-Authored-By: Claude Opus 5.5` and `Refs:` trailers)
+  - 2e479d6 chore(scaffold): create Strapi 5 TypeScript project with SQLite and
+  restricted CORS (Strapi 5.63.0, Node 22 image)
+  - 1e5fd29 chore(scaffold): add content model per ADR-001 (country, form-field,
+  plan, site-copy)
+  - 2654571 chore(scaffold): grant public find-only permissions in bootstrap and
+  add permissions test
+  - ec324c4 chore(scaffold): add idempotent CO/CL seed behind SEED_ON_BOOT
+  - dc89b92 chore(scaffold): add cms Dockerfile, secret-generating entrypoint
+  and docker-compose
+
+  **Files**
+  - `cms/`: the generated Strapi project, plus
+  `cms/src/api/{country,form-field,plan,site-copy}/`,
+  `cms/src/components/{shared,form,plan}/*.json`,
+  `cms/src/bootstrap/{permissions,seed,seed-data}.ts`, `cms/src/index.ts`,
+  `cms/config/middlewares.ts`.
+  - `cms/tests/public-permissions.test.mjs`, with `npm run test:permissions`
+  added to `cms/package.json`.
+  - `cms/Dockerfile`, `cms/docker-entrypoint.sh`, `cms/.dockerignore`,
+  `cms/.env.example`.
+  - `docker-compose.yml` and root `.env.example`.
+
+  **Permission model (verified on the running instance)**
+  - Models: `plugin::users-permissions.role` (queried with `{ type: 'public' }`)
+  and `plugin::users-permissions.permission` (created with `{ action, role:
+  role.id }`).
+  - Action format is exactly `api::plan.plan.find`, `api::country.country.find`,
+  `api::form-field.form-field.find` and `api::site-copy.site-copy.find`.
+  - I did not read the format back from an admin-created permission; I created
+  the rows in code and the 200s below confirm Strapi honours them.
+  - Startup log:
+  ```
+  [permissions] Granted public: api::country.country.find
+  [permissions] Granted public: api::form-field.form-field.find
+  [permissions] Granted public: api::plan.plan.find
+  [permissions] Granted public: api::site-copy.site-copy.find
+  ```
+  - It is grant-only. It warns about any extra `api::*` permission on Public and
+  never revokes.
+
+  **Docker evidence**
+  - Clean state: `docker compose down -v`, then `docker compose up -d --build
+  cms`.
+  - Container status: `car-insurance-project-cms-1 ... Up 19 seconds (healthy)
+  0.0.0.0:1337->1337/tcp`.
+  - The entrypoint logged `[entrypoint] generated new secrets in
+  /data/secrets.env`. The secrets live in the `cms_data` volume and persist
+  across restarts. After the restart there was no second "generated" line (count
+  1).
+  - SQLite is in the `cms_data` volume, uploads in `cms_uploads`.
+
+  **HTTP statuses for public writes**
+  - `POST /api/plans` returned 403.
+  - `PUT` and `DELETE` on `/api/<plural>/<documentId>` returned 403 for
+  countries, form-fields and plans.
+  - `PUT` and `DELETE` on `/api/site-copy` returned 403.
+  - `GET /api/plans/<documentId>` (findOne) returned 403, so findOne is not
+  granted.
+  - `PUT` or `DELETE` on the bare collection path, with no documentId, returns
+  405 because no route exists. The test always uses a seeded documentId.
+
+  **Permissions test** (`npm run test:permissions`, against the Docker cms): 16
+  tests, 16 pass, 0 fail.
+  - Reads: GET returns non-empty CO and CL data for countries, form-fields and
+  plans.
+  - Writes: POST, PUT and DELETE on each of the three collections are denied,
+  and `site-copy` PUT/DELETE are denied.
+  - Visibility: the draft field `draftOnlyField` is not returned for CO or CL.
+  With the app query, 3 active published plans come back per country (exactly
+  one recommended), and `Plan Legado` and `Plan Borrador` are absent.
+
+  **Seed idempotency**
+  - Counts before and after `docker compose restart cms` are identical, and the
+  second boot produced no `[seed]` log lines:
+  ```
+  countries published=2 draft=2
+  form-fields published=26 draft=28
+  plans published=8 draft=10
+  ```
+  - The first boot logged 41 `[seed]` lines (1 site-copy, 2 countries, 28
+  fields, 10 plans); the restart added none.
+  - Per country: CO has 14 published fields plus the draft field, CL has 12 plus
+  the draft field, and both have 5 plans (3 active, 1 inactive, 1 draft).
+  - Fields cover all 5 types and every validator: `colombianId` in CO, `rut` in
+  CL, plus `required`, `minLength`, `maxLength`, `min`, `max`, `pattern`,
+  `minAge` and `vehicleYear`. The field order differs between the countries.
+  - Copy keys are seeded in Spanish from SPEC-US-01 §4.3, SPEC-US-02 §4.3 and
+  SPEC-US-03 §4, using the ADR-001 dotted names. The `site-copy` entries follow
+  ADR-001.
+  - Sample responses showed `basePrice` as a JSON number (890000), not a string,
+  and `populate[0]=copy` works.
+
+  **Deviations from ADRs**
+  - None on the model or permissions. CORS uses `process.env.FRONTEND_ORIGIN ||
+  'http://localhost:4200'` instead of the `env()` helper; the behaviour is the
+  same.
+  - I added a `regex: "^[A-Z]{2}$"` constraint on `country.code`, which enforces
+  upper-case codes.
+  - I added a seed field `mileage` (number with `min`/`max` rules) to both
+  countries, because the phase-2 field list has no field that carries `min` and
+  `max`. The phase-2 list had no email-type field either, so the `email` field
+  is `text` with a `pattern` rule.
+
+  **Items the caller must act on**
+  1. `?status=draft` leaks drafts publicly. An anonymous `GET
+  /api/form-fields?status=draft` returns the draft-only field. Plans and
+  countries behave the same way (draft counts of 10 and 2 came back publicly).
+  Any Public `find` permission allows it. The app never sends `status`, and the
+  "not returned" test only covers the app's query. If this matters for
+  US-01-AC-05 or a review finding, the fix is a small middleware or policy that
+  strips `status=draft` from public requests. I did not add one because it is
+  outside the ADRs.
+  2. Docker Compose v5.6 on this Windows host fails with a bare "failed to
+  execute bake" error. The cause is a bake filesystem entitlement mismatch, with
+  a lowercase `c:\` context path against an uppercase `C:\` Dockerfile path. I
+  worked around it with `export BUILDX_BAKE_ENTITLEMENTS_FS=0` before `docker
+  compose up --build`. This is host-specific, not a repo problem, but it should
+  go in the README troubleshooting notes.
+  3. The Dockerfile strips CRLF from the entrypoint (`sed -i 's/\r$//'`),
+  because Windows checkouts convert it. A `.gitattributes` with `*.sh text
+  eol=lf` would be a good follow-up.
+
+  **Errors in the `strapi5-content-modeling` skill** (I did not edit it)
+  - §5 sketch: "`strapi.documents(...).findMany(...)` ... `if (existing.length >
+  0) return;  // idempotent: seed only an empty DB`". Seeding only when the DB
+  is empty was not what I did. I made it idempotent per record (country by
+  `code`, field by `key` + country, plan by `name` + country, using `findFirst`
+  with draft-status reads), so a partial or evolved seed gets completed rather
+  than skipped.
+  - §5 "Relations in `data`: ... **[unverified]**". Verified: `country:
+  '<country documentId>'` (a bare documentId string) works, even with
+  `strictRelations: true`.
+  - §3 "Enumeration ... **[unverified]** The docs list the type but don't show
+  the `enum` key." Verified: `{ "type": "enumeration", "enum": [...] }` works.
+  - §5 "`strapi.documents(uid).create({ data, status: 'published' })` creates
+  and publishes". Verified for collection types with D&P on. Existence checks
+  with a default (draft) `findFirst` return one row per document, so published
+  documents are not duplicated.
+  - §8 / §7 DB path. `DATABASE_FILENAME` is joined onto the project root by
+  `path.join(__dirname, '..', '..', filename)` in `config/database.ts`, so an
+  absolute path like `/data/data.db` does not work. In Docker I used
+  `../data/data.db`, which resolves to `/data/data.db`. The skill does not
+  mention this.
+  - §6 does not mention that Public rows must be created through
+  `strapi.db.query('plugin::users-permissions.permission')` with `role:
+  role.id`; this is now verified.
+  - Generated `config/api.ts` sets `strictParams: true` and `strictRelations:
+  true`. The skill says nothing about it. Unknown query params are rejected, so
+  the frontend must not send extra ones.
+  - ADR-003 and the skill say a public write returns 403 or 401, undocumented.
+  Verified fact: 403 for POST, and for PUT/DELETE on existing documentIds. 405
+  applies only for PUT/DELETE on the bare collection path.
+
+  **How to run**
+  - Full stack: `docker compose up --build` (needs the frontend Dockerfile from
+  the other agent). On this Windows host, export the bake workaround from item 2
+  first.
+  - CMS only: `docker compose up -d --build cms`, then `cd cms && npm run
+  test:permissions` (`STRAPI_URL` defaults to `http://localhost:1337`).
+  - The admin user is created by hand at `http://localhost:1337/admin`. No API
+  tokens and no admin credentials exist in the repo.
+
+● Both implementers are done. Now running the full clean-state verification
+  myself.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Scaffold Strapi cms and Docker" finished · 14m 42s
+
+  Ran 1 shell command · 1 failed (ctrl+o to expand)
+
+● The empty responses came from curl treating [] as glob syntax. Retrying with
+  -g:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The data looks right. One thing to check: SPEC-US-03's changelog refers to a
+  CL plan called "Plan Full". Checking the spec seed names:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● The plan seed conflicts with the SPEC-US-02 §3 table on names, prices, and the
+  "Plan Antiguo" versus "Plan Legado" labels, which the e2e acceptance criteria
+  rely on. I'm checking SPEC-US-01's seed expectations next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Field and draft seed match SPEC-US-01. I'm sending the plan fix back to the
+  CMS implementer.
+  ⎿  Resuming agent a4f3f44
+
+● While that runs, I'll correct the two skills based on the verified facts the
+  implementers reported.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Applying the verified corrections to both skills:
+
+● Bash(node - <<'EOF'
+      const fs=require('fs');…)
+  ⎿  Updated .claude\skills\angular-conventions\SKILL.md +5 -4
+      32 
+      33  - Local and shared state uses `signal`, `computed` and `linkedS
+          ignal` ([signals](https://angular.dev/guide/signals), [linked-s
+          ignal](https://angular.dev/guide/signals/linked-signal)). Use `
+          effect` only for side effects that leave Angular (e.g. writing
+          to `sessionStorage`), never to copy one signal into another.
+      34  - Wizard state lives in **one root service** (`QuoteStore`) exp
+          osing readonly signals plus intent methods (`setApplicant()`, `
+          selectPlan()`, `reset()`). Components never mutate store intern
+          als.
+      35 -- Persistence: the store writes a versioned snapshot (`{ v: 1, 
+         -country, values, planDocumentId }` under key `quote:v1:{CC}`, p
+         -er ADR-004) to `sessionStorage` from one `effect` and rehydrate
+         -s on init. Drop the snapshot if its version or country doesn't 
+         -match. The spec decides the exact fields.                      
+      35 +- Persistence: the store writes a versioned snapshot (`{ v: 1, 
+         +country, values, planDocumentId }` under key `quote:v1:{CC}`, p
+         +er ADR-004) to `sessionStorage` from one `effect` and rehydrate
+         +s on init. Drop the snapshot if its version or country doesn't 
+         +match. The spec decides the exact fields. Effects run lazily: t
+         +ests that read `sessionStorage` after a store change must flush
+         + them first (`TestBed.tick()`).                                
+      36  - RxJS only where it's natural (router events, HTTP internals).
+           Convert to signals at the boundary.
+      37 
+      38  ## 4. Data loading and the loading/error pattern
+      39 
+      40 -- HTTP: the current (v22) docs say `HttpClient` uses fetch by d
+         -efault and list only `withXhr()` ([http setup](https://angular.
+         -dev/guide/http/setup)). **[unverified] for v21**: on v21, regis
+         -ter `provideHttpClient(withFetch())` in `app.config.ts`, after 
+         -checking the v21 docs (v21.angular.dev/guide/http/setup) when s
+         -caffolding. Record the result here.                            
+      41 -- Read Strapi content with `httpResource()` or `resource()` ins
+         -ide a feature `*-api.ts` service ([http-resource](https://angul
+         -ar.dev/guide/http/http-resource), [resource](https://angular.de
+         -v/guide/signals/resource)). Read-only GETs only.               
+      40 +- HTTP: the current (v22) docs say `HttpClient` uses fetch by d
+         +efault and list only `withXhr()` ([http setup](https://angular.
+         +dev/guide/http/setup)). On v21 (21.2, Phase 2) we register `pro
+         +videHttpClient(withFetch())` in `app.config.ts`; it compiles an
+         +d works. Whether fetch is already the v21 default was not verif
+         +ied, so keep `withFetch()` explicit.                           
+      41 +- Read Strapi content with `httpResource()`, `resource()` or `r
+         +xResource({ stream })` (from `@angular/core/rxjs-interop`) insi
+         +de a feature `*-api.ts` service. **Exception:** `httpResource` 
+         +has no timeout option; when a spec requires a request timeout, 
+         +use `rxResource` with the RxJS `timeout` operator (same `isLoad
+         +ing()/error()/hasValue()/reload()` API). ([http-resource](https
+         +://angular.dev/guide/http/http-resource), [resource](https://an
+         +gular.dev/guide/signals/resource)). Read-only GETs only.       
+      42  - Map raw Strapi responses to **typed domain models** in one ma
+          pper function (`toFormFieldConfig()`), unit-tested. Components
+          never see raw Strapi shapes. No `any`. Unknown field types and
+          invalid configs are dropped and logged with `console.warn`, nev
+          er crash the form.
+      43  - Every remote view handles all four states, driven by `status(
+          )`/`isLoading()`/`error()`/`hasValue()`:
+      44 
+     ...
+      61 
+      62  ## 6. Routing and structure
+      63 
+      64 -- Routes: `/:country/datos`, `/:country/planes`, `/:country/res
+         -umen`, `/:country/confirmacion` (decided in ADR-002: async `can
+         -Match` resolves the code against Strapi; an unknown code render
+         -s not-found in place, keeping the URL). Lazy-load with `loadCom
+         -ponent` (**[unverified]**, see [loading-strategies](https://ang
+         -ular.dev/guide/routing/loading-strategies)).                   
+      64 +- Routes: `/:country/datos`, `/:country/planes`, `/:country/res
+         +umen`, `/:country/confirmacion` (decided in ADR-002: async `can
+         +Match` resolves the code against Strapi; an unknown code render
+         +s not-found in place, keeping the URL). Lazy-load with `loadCom
+         +ponent` (verified in the Phase 2 scaffold: lazy chunks per rout
+         +e; see [loading-strategies](https://angular.dev/guide/routing/l
+         +oading-strategies)).                                           
+      65  - Read route params as inputs with `withComponentInputBinding()
+          ` ([read-route-state](https://angular.dev/guide/routing/read-ro
+          ute-state)).
+      66 +- In async functional guards, call every `inject()` **before** 
+         +the first `await`: the injection context is lost after it (hit 
+         +in Phase 2). The current navigation is the signal `router.curre
+         +ntNavigation()` in v21 (`getCurrentNavigation()` is the older A
+         +PI).                                                           
+      67  - Step guards are functional `CanActivateFn` that return a `Url
+          Tree` (redirect to the first incomplete step), not `false` + na
+          vigate ([route-guards](https://angular.dev/guide/routing/route-
+          guards)).
+      68  - **Folders by feature, not by type** (no `components/`, `servi
+          ces/` folders). File names have no type suffix: `plan-list.ts`,
+           `plan-list.html`, `plan-list.spec.ts` ([style guide](https://a
+          ngular.dev/style-guide)).
+      69 
+  ⎿  Updated .claude\skills\strapi5-content-modeling\SKILL.md +10 -4
+      44  - Attribute types: `string, text, richtext, enumeration, email,
+           password, uid, date, time, datetime, timestamp, integer, bigin
+          teger, float, decimal, boolean, json, media, relation, customFi
+          eld, component, dynamiczone` (+ `locale`/`localizations` with i
+          18n). **There is no `blocks` type in the schema reference; use
+          `text` (or `richtext`).**
+      45  - Relation: `{ "type": "relation", "relation": "manyToOne", "ta
+          rget": "api::country.country", "inversedBy": "plans" }`. The in
+          verse side uses `mappedBy`. An inverse side without an owning s
+          ide fails at boot.
+      46  - Component attribute: `{ "type": "component", "component": "pl
+          an.coverage", "repeatable": true }`.
+      47 -- Enumeration: `{ "type": "enumeration", "enum": ["text","numbe
+         -r","select","date","checkbox"] }`. **[unverified]** The docs li
+         -st the type but don't show the `enum` key. Create one field in 
+         -the admin Content-type Builder and copy the generated JSON.    
+      47 +- Enumeration: `{ "type": "enumeration", "enum": ["text","numbe
+         +r","select","date","checkbox"] }`. **Verified on Strapi 5.63 (P
+         +hase 2):** this exact shape works.                             
+      48 
+      49  Prefer creating types in the **admin Content-type Builder** (de
+          v mode) and committing the generated files. That's less error-p
+          rone than hand-writing JSON.
+      50 
+     ...
+      73    GET /api/countries?filters[code][$eq]=CO&populate[0]=copy
+      74    GET /api/site-copy?populate[0]=copy
+      75    ```
+      76 +- New projects generate `config/api.ts` with `strictParams: tru
+         +e` and `strictRelations: true` (verified 5.63): unknown query p
+         +arams are rejected, so the frontend must send only documented p
+         +arams.                                                         
+      77 +- **`status=draft` is honored for anonymous `find`** (verified 
+         +5.63): any Public `find` lets a caller read drafts with `?statu
+         +s=draft`. Draft & Publish hides drafts from the app's queries, 
+         +not from a determined caller. Don't put secrets in drafts.     
+      78 +- With curl, use `curl -g` so `[` `]` in query strings are not 
+         +treated as glob ranges.                                        
+      79  - Bracket lists are capped at 100 items by default (`arrayLimit
+          `); stay well below that.
+      80 
+      81  ## 5. Seeding (CO + CL, idempotent, part of `docker compose up`
+          )
+     ...
+       92        filters: { code: 'CO' },
+       93        pagination: { pageSize: 1 },   // pagination object, not
+            a root pageSize
+       94      });
+       92 -    if (existing.length > 0) return;  // idempotent: seed only
+          - an empty DB                                                  
+       93 -    // create countries, then fields and plans with status: 'p
+          -ublished'                                                     
+       95 +    // Project practice (Phase 2): idempotent PER RECORD, not 
+          +"skip if DB not empty":                                       
+       96 +    // look up country by code, field by key+country, plan by 
+          +name+country (findFirst),                                     
+       97 +    // create only what is missing. A partial or evolved seed 
+          +gets completed.                                               
+       98    },
+       99  };
+      100  ```
+     ...
+      103  - `strapi.documents(uid).create({ data, status: 'published' })
+           ` creates **and publishes**. Without `status`, it creates a dr
+           aft.
+      104  - `strapi.documents(uid).publish({ documentId })` takes an obj
+           ect, not a bare ID.
+      105  - **Reads default to `draft`** in the Document Service (the op
+           posite of REST). Pass `status: 'published'` when you mean publ
+           ished.
+      102 -- Relations in `data`: pass the related `documentId` (e.g. `co
+          -untry: coDocumentId`). **[unverified]** Confirm the accepted r
+          -elation input shape (`documentId` string vs `{ connect: [...] 
+          -}`) on the Document Service / relations pages before writing t
+          -he seed.                                                      
+      106 +- Relations in `data`: pass the related `documentId` as a bare
+          + string (e.g. `country: coDocumentId`). **Verified on 5.63**, 
+          +also with `strictRelations: true`.                            
+      107  - Document Service output is **not sanitized**. Don't return i
+           t from custom controllers without `strapi.contentAPI.sanitize.
+           output`. Prefer the default controllers for the public API.
+      108 
+      109  Alternative: `strapi import -f <file>` restores an export, but
+            it **deletes all existing data first**, needs identical schem
+           as, and doesn't restore admin users or API tokens ([import](ht
+           tps://docs.strapi.io/cms/features/data-management/import), [ex
+           port](https://docs.strapi.io/cms/features/data-management/expo
+           rt)). We prefer bootstrap seeding: the seed is readable JSON i
+           n git and the reset behavior is explicit.
+     ...
+      111  ## 6. Permissions: minimal Public role
+      112 
+      113  - All content types are **private by default**. The Public rol
+           e exists by default and can't be deleted ([users-permissions](
+           https://docs.strapi.io/cms/features/users-permissions), [REST]
+           (https://docs.strapi.io/cms/api/rest)).
+      114 +- Internal API (verified 5.63, undocumented): role = `strapi.d
+          +b.query('plugin::users-permissions.role').findOne({ where: { t
+          +ype: 'public' } })`; grant = `strapi.db.query('plugin::users-p
+          +ermissions.permission').create({ data: { action: 'api::plan.pl
+          +an.find', role: role.id } })`.                                
+     … +4 lines (ctrl+o to expand)
+  ⎿  (another command ran in this repository at the same time; a change
+     made by either may show under either result)
+
+● Both skills now carry the verified facts. I'll commit them once the CMS
+  implementer finishes, so the two of us aren't committing to the same index at
+  once.
+
+› Message from implementer
+  The plan seed now matches the SPEC-US-02 §3 seed table. It is committed as
+  d047b3e `chore(scaffold): align plan seed with SPEC-US-02 seed table` (Refs:
+  SPEC-US-02, ADR-001, with the Co-Authored-By trailer). I changed only
+  `cms/src/bootstrap/seed-data.ts` and `cms/tests/public-permissions.test.mjs`.
+  `seed.ts` needed no change.
+
+  **What changed**
+  - CO active published plans: Plan Básico 850000, Plan Estándar 1250000
+  (recommended), Plan Premium 1900000.
+  - CL active published plans: Plan Esencial 259990, Plan Full 389990
+  (recommended), Plan Full Plus 549990.
+  - Both countries: "Plan Antiguo" (published, `active=false`) replaces "Plan
+  Legado", and "Plan Borrador" is draft only.
+  - Coverages and benefits follow the spec table per country (CO: Pérdida total
+  por daños, Hurto, Grúa 24/7, Vehículo de reemplazo; CL: Daños propios, Robo,
+  Asistencia en ruta, Auto de reemplazo).
+  - The permissions test now checks for "Plan Antiguo" instead of "Plan Legado".
+
+  **Other spec values**
+  - SPEC-US-03 only asserts "Plan Estándar" for CO and "Plan Full" for CL, plus
+  the masked-document examples. All of these match the new seed.
+  - `maskInSummary=true` is set on the CO `documentNumber` field and on the CL
+  RUT field (key `documentNumber`), as SPEC-US-01 §3 requires.
+
+  **Verification**
+  - I ran `docker compose down -v` and then `docker compose up -d --build` for
+  the full stack. `cms` is `Up 24 seconds (healthy)` and `frontend` was `Up 3
+  seconds` when I checked. Both are still running.
+  - `npm run test:permissions` in `cms`: 16 pass, 0 fail.
+  - Active-plans query (curl with `-g`, `filters[active][$eq]=true`, sorted by
+  `order` then `name`) returned exactly:
+  ```
+  CO 1 Plan Básico 850000 COP false Responsabilidad civil / Grúa 24/7
+  CO 2 Plan Estándar 1250000 COP true Responsabilidad civil|Pérdida total por
+  daños / Grúa 24/7|Vehículo de reemplazo
+  CO 3 Plan Premium 1900000 COP false Responsabilidad civil|Pérdida total por
+  daños|Hurto / Grúa 24/7|Vehículo de reemplazo
+  CL 1 Plan Esencial 259990 CLP false Responsabilidad civil / Asistencia en ruta
+  CL 2 Plan Full 389990 CLP true Responsabilidad civil|Daños propios /
+  Asistencia en ruta|Auto de reemplazo
+  CL 3 Plan Full Plus 549990 CLP false Responsabilidad civil|Daños propios|Robo
+  / Asistencia en ruta|Auto de reemplazo
+  ```
+  - "Plan Antiguo" and "Plan Borrador" are absent from this query, which the
+  permissions test also asserts.
+
+  Plan coverage and benefit counts per tier (1, 2 and 3 coverages; 1, 2 and 2
+  benefits) are my own choice, since the spec lists only the names.
+
+● Plan seed is aligned. Committing the skills, then running the remaining checks
+  myself: frontend routes, the permissions test, e2e smoke and restart
+  idempotency.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Scaffold Strapi cms and Docker" finished · 1m 28s
+● All 16 API checks pass and writes return 403; next I'll confirm in a real
+  browser that /co and /cl render the right country and /xx shows not-found,
+  since HTTP 200 alone doesn't prove the SPA routes work. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Last check: restart the stack and confirm no duplicate seed rows.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● HC — Phase 2 infrastructure scaffold: ready for your review
+
+  The scaffold is built and verified, and it is ready for your decision. Branch
+  chore/scaffold-infra has 10 commits, nothing is pushed, and the stack is still
+  running if you want to look.
+
+  What was built
+
+  I split the work between two implementer subagents running in parallel, and I
+  ran the final verification myself.
+
+  - cms/: Strapi 5.63, TypeScript and SQLite.
+    - The content model follows ADR-001 and is stored as schema.json files.
+      country and site-copy have Draft & Publish off; form-field and plan have
+      it on.
+    - On every start, bootstrap gives the Public role find only, on those four
+      types (ADR-003). It never removes permissions.
+    - A seed runs behind SEED_ON_BOOT and doesn't create duplicates when it runs
+      again.
+    - The container generates its secrets on first start and keeps them in the
+      data volume. No admin user and no API tokens are created.
+  - frontend/: Angular 21.2 (standalone components, no zone.js, Vitest).
+    Everything is in core/ and shared/; there is no code under features/.
+    - Routes follow ADR-002, including the guard that checks the country against
+      Strapi, and the not-found page keeps the URL you typed.
+    - Read-only Strapi client and the country context.
+    - QuoteStore saves to sessionStorage under one key per country (ADR-004).
+    - Step indicator, nginx that forwards /api to Strapi, proxy.conf.json for
+      local dev, and a Playwright smoke test.
+  - docker-compose.yml: a healthcheck on cms, and frontend waits until cms is
+    healthy.
+
+  Verification evidence
+
+  I started from a clean state (down -v, then up --build).
+
+  1. Containers: cms is healthy and frontend is up. Only cms has a healthcheck,
+     as the prompt asked.
+  2. Seed data, read through the frontend's /api:
+     - CO: es-CO/COP, legal age 18, 43 copy keys, 14 fields. Plans are Básico
+       850000, Estándar 1250000 (recommended) and Premium 1900000.
+     - CL: es-CL/CLP, 12 fields in a different order. Plans are Esencial 259990,
+       Full 389990 (recommended) and Full Plus 549990.
+     - Each country also has a draft field draftOnlyField, "Plan Antiguo"
+       (published but inactive) and "Plan Borrador" (draft). The app's queries
+       don't return any of them.
+     - site-copy has the 8 picker.*/notFound.* keys.
+  3. Permissions test (npm run test:permissions): 16 of 16 pass. Strapi returns
+     403 for anonymous POST, PUT and DELETE on all four types, and for
+     single-entry reads (findOne).
+  4. Browser check against the running stack:
+
+  | URL       | Result                                                 |
+  |-----------|--------------------------------------------------------|
+  | /         | "Elige tu país"                                        |
+  | /co       | redirects to /co/datos                                 |
+  | /cl       | redirects to /cl/datos                                 |
+  | /CO/datos | redirects to /co/datos                                 |
+  | /xx       | "País no encontrado", URL kept                         |
+  | /zz/datos | "País no encontrado", URL kept, no form-fields request |
+     The Playwright smoke test passes.
+  5. Restart: the seed row counts were identical before and after, and the
+     restart logged no new seed lines.
+
+  Deviations and decisions for you
+
+  1. Plan seed corrected: the first seed didn't match the SPEC-US-02 §3 table
+     (names and prices). I sent it back to the implementer and it now matches
+     exactly.
+  2. The seed adds a mileage number field per country. It was added because
+     nothing on the field list uses the min and max validators. Email is a text
+     field with a pattern rule.
+  3. Strapi returns drafts to anyone who asks with ?status=draft. This works on
+     every type the Public role can read. The app never sends that parameter, so
+     US-01-AC-05 still holds, but anyone can read draft content. This is a gap
+     in ADR-003. Should it be fixed with a small policy now (through an ADR
+     change), or accepted as a risk?
+  4. Step indicator shows numbers only: no spec defines copy keys for the step
+     labels. If you want labels, the spec-writer adds the keys through the spec
+     change loop.
+  5. Windows-specific:
+     - Build workaround: this machine needs BUILDX_BAKE_ENTITLEMENTS_FS=0 for
+       docker compose up --build (a Docker Compose 5.6 bug with the drive-letter
+       case of the path). This goes in the README troubleshooting section.
+     - Line endings: the cms Dockerfile strips Windows line endings from the
+       entrypoint script. A .gitattributes rule (*.sh eol=lf) would be the
+       cleaner fix.
+  6. Smaller choices:
+     - CORS reads process.env.FRONTEND_ORIGIN rather than Strapi's env() helper;
+       the behavior is the same.
+     - country.code also has a rule that it must be upper case (^[A-Z]{2}$).
+
+  Skill corrections (commit f9a23cc)
+
+  - strapi5-content-modeling:
+    - The enum shape and the relation-by-documentId input are now marked as
+      verified.
+    - It now records the Strapi model names and action format the permission
+      grant uses.
+    - It records that a denied write returns 403, and that PUT/DELETE without an
+      ID return 405.
+    - Seeding is described as checking each record rather than "skip if the
+      database isn't empty".
+    - It notes the strict query parameters, the ?status=draft gap and curl -g.
+  - angular-conventions:
+    - Use withFetch(), and use rxResource when a request needs a timeout.
+    - Call inject() before any await in a guard.
+    - Use router.currentNavigation() instead of the older call.
+    - Tests that read sessionStorage must flush effects first.
+
+  Please reply APPROVED or REJECTED: <reason>, and tell me what to do about item
+  3. After approval I'll update the README "How to run" section, merge into
+  main with a merge commit, push, and remind you to run /export.
+
+> APPROVED.
+
+  - Item 2 (mileage field): accepted.
+  - Item 3 (?status=draft exposes drafts): accepted as a known risk for now;
+  impact is low (unpublished business content, no personal data). Record it in
+  README "Known risks" and in FLOW.md as a finding of this phase, with the
+  proposed fix: a global Strapi middleware that forces status=published for
+  unauthenticated /api requests, plus a test. If time remains at the end, we
+  fix it.
+  - Item 4: numbers only, no labels.
+  - Item 5: add .gitattributes with "*.sh eol=lf" and the
+  BUILDX_BAKE_ENTITLEMENTS_FS=0 note in README troubleshooting.
+  - Item 6: accepted.
+
+  I checked /co, /cl and the Strapi admin manually. Update README "How to run",
+  merge into main with a merge commit, and push.
+
+● Approval received. Updating the README, FLOW.md and .gitattributes now, then
+  I'll merge and push.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(printf '# Shell scripts run inside Linux containers: keep LF on every
+      OS\n*.sh text eol=lf\n' > .gitattributes && node - <<'EOF'
+      const fs=require('fs');…)
+  ⎿  Created .gitattributes +2
+      1 +# Shell scripts run inside Linux containers: keep LF on every OS
+      2 +*.sh text eol=lf                                                
+  ⎿  Updated FLOW.md +5
+      109 
+      110  - **SPEC-US-01 blocked by a safety classifier (2026-11-23, Pha
+           se 1).** Two separate `spec-writer` runs for US-01 were stoppe
+           d mid-write by a safety classifier, and no file was produced.
+           The second run had stricter content rules: validators describe
+           d by behavior only, clearly fake examples only. The likely tri
+           gger is the national-ID validator content (Chilean RUT check d
+           igit, Colombian ID format), even with fictitious data. The mai
+           n session did not retry a third time or try to work around the
+            block, and escalated to the human. **Adjustment:** Andres Bel
+           tran drafted SPEC-US-01 outside Claude Code, in his planning c
+           hat on Claude.ai (its log is in `docs/ai-sessions/`), and revi
+           ewed the draft himself. Inside Claude Code, `spec-writer` then
+            only reviews and completes it: remaining gaps, P1/P2 tags, fo
+           rmat against the `spec-authoring` skill, and consistency with
+           SPEC-US-02/03 (`vehicleYear` field identification, 10 s timeou
+           t, `maskInSummary`). It then goes through HC1 as usual.
+      111 
+      112 +- **Phase 2 scaffold split across two implementers (2026-11-23
+          +).** `cms/`+Docker and the Angular shell were built by two `im
+          +plementer` runs in parallel on `chore/scaffold-infra`, each co
+          +mmitting only its own paths. The main session then verified th
+          +e whole stack from a clean state itself. **Finding 1:** the fi
+          +rst plan seed did not match the SPEC-US-02 §3 seed table (name
+          +s, prices); the main session caught it while verifying and sen
+          +t it back to the implementer before the checkpoint. **Adjustme
+          +nt:** seed tables in specs are treated as contracts and checke
+          +d against the API at every checkpoint.                        
+      113 +- **Finding 2 (security): drafts are readable with `?status=dr
+          +aft` (2026-11-23, Phase 2).** Strapi 5.63 honors `status=draft
+          +` for anonymous `find`, so the Public role can read unpublishe
+          +d entries. Draft & Publish hides drafts from the app's queries
+          +, not from a direct caller. ADR-003 did not anticipate this. *
+          +*Human decision (Andres Beltran):** accepted as a known risk f
+          +or now (low impact: unpublished business content, no personal 
+          +data), recorded in README "Known risks". **Proposed fix, if ti
+          +me remains:** a global Strapi middleware that forces `status=p
+          +ublished` on unauthenticated `/api` requests, plus a test.    
+      114 +- **Skills corrected from verified facts (Phase 2).** Implemen
+          +ters reported where the `strapi5-content-modeling` and `angula
+          +r-conventions` skills were unverified or wrong (permission mod
+          +el, 403 vs 405, strict params, `rxResource` for timeouts, `inj
+          +ect()` before `await` in guards). The main session updated the
+          + skills so later stories start from verified facts.           
+      115 +- **Windows host issues (Phase 2).** Docker Compose 5.6 bake f
+          +ailed on drive-letter case (`BUILDX_BAKE_ENTITLEMENTS_FS=0` wo
+          +rkaround, in README troubleshooting), and CRLF checkouts broke
+          + the cms entrypoint (`.gitattributes` with `*.sh eol=lf`).    
+      116 +                                                              
+      117  TODO (remaining items at project end)
+      118 
+      119  ## Where AI was deliberately not used, and why
+  ⎿  Updated README.md +46 -5
+       6 
+       7  Built with an AI-driven, spec-driven flow. See [FLOW.md](FLOW.m
+          d) and [CLAUDE.md](CLAUDE.md).
+       8 
+       9 -## Quick start                                                 
+       9 +## How to run                                                  
+      10 
+      11 -TODO: `docker compose up`, URLs (frontend, Strapi admin), seede
+         -d countries, how to switch country.                            
+      11 +Requirements: Docker with Docker Compose v2+. Nothing else is n
+         +eeded for the running app.                                     
+      12 +                                                               
+      13 +```bash                                                        
+      14 +docker compose up --build                                      
+      15 +```                                                            
+      16 +                                                               
+      17 +| URL | What |                                                 
+      18 +|-----|------|                                                 
+      19 +| http://localhost:4200 | Angular app (country picker at `/`, t
+         +hen `/co` or `/cl`) |                                          
+      20 +| http://localhost:1337/admin | Strapi admin |                 
+      21 +                                                               
+      22 +- **Clean clone works as is.** No `.env` is required: the `cms`
+         + container generates its secrets on first start and keeps them 
+         +in the `cms_data` volume. To override defaults, copy `.env.exam
+         +ple` to `.env` (placeholders only).                            
+      23 +- **Seed data** for Colombia (`CO`) and Chile (`CL`) is loaded 
+         +on start (`SEED_ON_BOOT=true`): countries with copy and terms, 
+         +form fields (plus one draft field per country), and plans (3 ac
+         +tive, 1 inactive, 1 draft per country). All data is fictitious.
+         + Seeding is idempotent: restarts create no duplicates.         
+      24 +- **Public permissions** (read-only `find` on `country`, `form-
+         +field`, `plan`, `site-copy`) are granted automatically in Strap
+         +i `bootstrap` ([ADR-003](docs/adr/ADR-003-strapi-public-permiss
+         +ions-bootstrap.md)). No API token exists or is needed.         
+      25 +- **Strapi admin user:** create it by hand on the first visit t
+         +o http://localhost:1337/admin. No admin credentials are stored 
+         +in the repo.                                                   
+      26 +- **Switch country:** pick it on `/`, or open `/co` or `/cl` di
+         +rectly. An unknown code (e.g. `/xx`) shows the not-found page. 
+      27 +- **Reset everything** (database, uploads, generated secrets): 
+         +`docker compose down -v`.                                      
+      28 +                                                               
+      29 +### Local development (without Docker for the frontend)        
+      30 +                                                               
+      31 +```bash                                                        
+      32 +docker compose up -d cms          # Strapi on :1337            
+      33 +cd frontend && npm ci && npm start # ng serve on :4200, proxies
+         + /api to :1337 (proxy.conf.json)                               
+      34 +```                                                            
+      35 +                                                               
+      36 +### Troubleshooting                                            
+      37 +                                                               
+      38 +- **`failed to execute bake` on Windows** (Docker Compose v5.x)
+         +: a Buildx bake filesystem-entitlement check fails on drive-let
+         +ter case. Run `export BUILDX_BAKE_ENTITLEMENTS_FS=0` (Git Bash)
+         + or `$env:BUILDX_BAKE_ENTITLEMENTS_FS=0` (PowerShell) before `d
+         +ocker compose up --build`.                                     
+      39 +- **Port in use:** stop whatever is on 4200 or 1337, or change 
+         +the host port in `docker-compose.yml`.                         
+      40 +- **curl and Strapi filters:** use `curl -g` so `[` `]` in quer
+         +y strings are not treated as globs.                            
+      41 
+      42  ## Repository layout
+      43 
+     … +35 lines (ctrl+o to expand)
+
+  Ran 1 shell command · 1 failed (ctrl+o to expand)
+
+● The renormalize step staged the README and FLOW.md as well, so they went into
+  the .gitattributes commit. That commit hasn't been pushed, so I'll split it
+  back into two commits:
+
+● Bash(git log --oneline -1 && git reset -q --soft HEAD~1 && git restore
+      --staged README.md FLOW.md && git commit -q -m "chore(env): enforce LF
+      line endings for shell…)
+  ⎿  Updated .claude\skills\angular-conventions\SKILL.md +105 -105
+  ⎿  Updated .claude\skills\strapi5-content-modeling\SKILL.md +148 -148
+  ⎿  Updated .env.example +11 -11
+  ⎿  Updated .gitattributes +2 -2
+  ⎿  Updated FLOW.md +121 -121
+  ⎿  … +75 files changed
+     README.md
+     cms\.dockerignore
+     cms\.env.example
+     +72 more
+  ⎿  (a git step in this command can move the working tree, so these may be
+     its changes, not edits) (ctrl+o to expand)
+  ⎿  2 skills available
+
+● Phase 2 is merged into main with a merge commit (465cf5f) and pushed. I also
+  pushed the chore/scaffold-infra branch.
+
+  I applied your decisions in two commits on the branch before merging:
+  - README:
+    - The "How to run" section now covers docker compose up --build, both URLs,
+      no .env needed on a clean clone, the seed data, creating the admin user by
+      hand, and reset.
+    - It also explains running the frontend locally against the Strapi
+      container, and the commands for the permissions, unit and e2e tests.
+    - Troubleshooting has the BUILDX_BAKE_ENTITLEMENTS_FS=0 workaround and the
+      curl -g tip.
+  - Known risks: a new README section records the ?status=draft exposure as
+    accepted by you, with low impact, and the proposed fix: a Strapi middleware
+    that forces status=published on anonymous requests, plus a test.
+  - FLOW.md: "What did not work as expected" now lists the Phase 2 findings: the
+    plan seed caught during verification, the draft exposure and your decision,
+    the skill corrections, and the Windows host issues.
+  - .gitattributes: added with *.sh text eol=lf.
+  - Recorded as decided, no code change: the step indicator stays numbers only,
+    and items 2 and 6 are accepted.
+
+  Note: the renormalize step pulled the README and FLOW.md into the
+  .gitattributes commit by mistake. I split it back into two commits locally
+  before anything was pushed, so the history keeps one change per commit.
+
+  The stack is still running. Stop it with docker compose down, or use down -v
+  for a full reset.
+
+  Reminder: please run /export and save it as
+  docs/ai-sessions/2026-11-23-phase-2.txt. Then I can copy the raw transcripts,
+  run the email and secret scans, and commit the session logs.
