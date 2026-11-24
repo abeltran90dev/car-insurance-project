@@ -1,0 +1,93 @@
+<section class="page applicant-form">
+  @if (country(); as c) {
+    <h1 #heading tabindex="-1">{{ text('form.title', '') }}</h1>
+  }
+
+  @if (!country()) {
+    <p role="alert" data-testid="form-error">{{ fallback.error }}</p>
+    <button type="button" class="button" (click)="retry()">{{ fallback.retry }}</button>
+  } @else if (fieldsResource.isLoading()) {
+    <div aria-live="polite" data-testid="form-loading">
+      <p>{{ text('form.loading', fallback.loading) }}</p>
+    </div>
+  } @else if (fieldsResource.error()) {
+    <p role="alert" data-testid="form-error">{{ text('form.error', fallback.error) }}</p>
+    <button type="button" class="button" (click)="retry()">{{ text('common.retry', fallback.retry) }}</button>
+  } @else if (fieldsResource.hasValue() && fields().length === 0) {
+    <p data-testid="form-empty">{{ text('form.empty', '') }}</p>
+  } @else if (form(); as group) {
+    <p>{{ text('form.intro', '') }}</p>
+    <form class="form" [formGroup]="group" (ngSubmit)="submit()" novalidate>
+      @for (field of fields(); track field.key) {
+        @let invalid = isInvalidShown(field.key);
+        @let error = errorFor(field.key);
+        <div class="field" [class.field--checkbox]="field.type === 'checkbox'" [attr.data-field]="field.key">
+          @switch (field.type) {
+            @case ('checkbox') {
+              <input
+                type="checkbox"
+                [id]="id(field)"
+                [formControl]="controlFor(field.key)"
+                [attr.required]="field.required ? '' : null"
+                [attr.aria-required]="field.required ? 'true' : null"
+                [attr.aria-invalid]="invalid ? 'true' : null"
+                [attr.aria-describedby]="describedBy(field)"
+              />
+              <label [for]="id(field)">{{ field.label }}</label>
+            }
+            @case ('select') {
+              <label [for]="id(field)">{{ field.label }}</label>
+              <select
+                [id]="id(field)"
+                [formControl]="controlFor(field.key)"
+                [attr.required]="field.required ? '' : null"
+                [attr.aria-required]="field.required ? 'true' : null"
+                [attr.aria-invalid]="invalid ? 'true' : null"
+                [attr.aria-describedby]="describedBy(field)"
+              >
+                <option value="">{{ field.placeholder }}</option>
+                @for (option of field.options; track option.value) {
+                  <option [value]="option.value">{{ option.label }}</option>
+                }
+              </select>
+            }
+            @case ('number') {
+              <label [for]="id(field)">{{ field.label }}</label>
+              <input
+                type="number"
+                inputmode="numeric"
+                [id]="id(field)"
+                [formControl]="controlFor(field.key)"
+                [attr.placeholder]="field.placeholder"
+                [attr.required]="field.required ? '' : null"
+                [attr.aria-required]="field.required ? 'true' : null"
+                [attr.aria-invalid]="invalid ? 'true' : null"
+                [attr.aria-describedby]="describedBy(field)"
+              />
+            }
+            @default {
+              <label [for]="id(field)">{{ field.label }}</label>
+              <input
+                [id]="id(field)"
+                [type]="field.type"
+                [formControl]="controlFor(field.key)"
+                [attr.placeholder]="field.placeholder"
+                [attr.required]="field.required ? '' : null"
+                [attr.aria-required]="field.required ? 'true' : null"
+                [attr.aria-invalid]="invalid ? 'true' : null"
+                [attr.aria-describedby]="describedBy(field)"
+              />
+            }
+          }
+          @if (field.helpText) {
+            <p class="field__help" [id]="id(field) + '-help'">{{ field.helpText }}</p>
+          }
+          @if (invalid) {
+            <p class="field__error" [id]="id(field) + '-error'">{{ error }}</p>
+          }
+        </div>
+      }
+      <button type="submit" class="button">{{ text('common.continue', '') }}</button>
+    </form>
+  }
+</section>
