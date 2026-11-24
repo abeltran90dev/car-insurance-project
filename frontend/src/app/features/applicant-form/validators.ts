@@ -43,7 +43,7 @@ function isEmpty(field: FormFieldConfig, value: FieldValue): boolean {
   return field.type === 'checkbox' ? value !== true : value === null || value === '';
 }
 
-const RUT_PATTERN = /^(\d{6,8})-?([\dK])$/;
+const RUT_PATTERN = /^(\d+)-?([\dK])$/;
 
 /** Canonical RUT `body-DV` (no dots, uppercase K), or null when malformed or the check digit is wrong. */
 export function normalizeRut(input: string): string | null {
