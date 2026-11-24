@@ -86,7 +86,6 @@ test.describe('US-03 summary and payment (e2e)', () => {
   for (const cc of ['co', 'cl']) {
     const CC = cc.toUpperCase();
 
-    // BUG: TW-BUG-01 summaryGuard NG0203 blocks every summary entry with valid step 1
     test(`US-03-AC-01 summary shows policyholder, vehicle and plan with final price (${cc})`, async ({ page, request }) => {
       const plan = await planInfo(request, cc);
       await seedState(page, cc, plan.documentId);
@@ -101,15 +100,19 @@ test.describe('US-03 summary and payment (e2e)', () => {
           `/api/form-fields?filters[country][code][$eq]=${CC}&pagination[pageSize]=100&populate[0]=options`,
         )
       ).json();
-      const expectedKeys = (api.data as Array<{ key: string }>)
-        .map((f) => f.key)
-        .filter((k) => STEP1[cc][k] !== undefined && STEP1[cc][k] !== '');
-      expect(expectedKeys.length).toBeGreaterThan(5);
-      for (const key of expectedKeys) {
-        await expect(page.getByTestId(`row-${key}`), `row for ${key}`).toBeVisible();
+      const expectedFields = (api.data as Array<{ key: string; label: string }>).filter(
+        (f) => STEP1[cc][f.key] !== undefined && STEP1[cc][f.key] !== '',
+      );
+      expect(expectedFields.length).toBeGreaterThan(5);
+      for (const f of expectedFields) {
+        const row = page.getByTestId(`row-${f.key}`);
+        await expect(row, `row for ${f.key}`).toBeVisible();
+        await expect(row.locator('dt'), `label for ${f.key}`).toHaveText(f.label.trim());
       }
-      const draft = (api.data as Array<{ key: string }>).find((f) => f.key === 'draftOnlyField');
-      expect(draft).toBeUndefined();
+      // A non-masked field shows its entered value (firstName is plain text in both countries).
+      await expect(page.getByTestId('row-firstName').locator('dd')).toHaveText(String(STEP1[cc]['firstName']));
+      // Unpublished (draft) fields must not appear on the page.
+      await expect(page.getByTestId('row-draftOnlyField')).toHaveCount(0);
 
       // Price: vehicle age 2 -> no surcharge, so final price equals the base price (SPEC-US-02 AC-05).
       const price = page.getByTestId('summary-price');
@@ -192,7 +195,6 @@ test.describe('US-03 summary and payment (e2e)', () => {
     });
   }
 
-  // BUG: TW-BUG-01 (summary unreachable)
   test('US-03-AC-08 double click produces a single payment', async ({ page, request }) => {
     await openSummary(page, request, 'co');
     await openGateway(page);
@@ -202,7 +204,6 @@ test.describe('US-03 summary and payment (e2e)', () => {
     await expect(page.getByTestId('quote-number')).toHaveText(/^COT-CO-\d{8}-[A-Z0-9]{6}$/);
   });
 
-  // BUG: TW-BUG-01 (summary unreachable)
   test('US-03-AC-10 clears wizard state after approval', async ({ page, request }) => {
     await openSummary(page, request, 'co');
     await openGateway(page);
@@ -221,14 +222,12 @@ test.describe('US-03 summary and payment (e2e)', () => {
     await expect(page).toHaveURL(/\/cl\/datos$/);
   });
 
-  // BUG: TW-BUG-01 (guard throws NG0203; lands on / instead of /cl/planes)
   test('US-03-AC-11 summary guard redirects to first incomplete step (valid step 1, no plan)', async ({ page }) => {
     await seedState(page, 'cl', null);
     await page.goto('/cl/resumen');
     await expect(page).toHaveURL(/\/cl\/planes$/);
   });
 
-  // BUG: TW-BUG-01 (summary unreachable)
   test('US-03-AC-12 gateway has no card inputs', async ({ page, request }) => {
     await openSummary(page, request, 'co');
     await openGateway(page);

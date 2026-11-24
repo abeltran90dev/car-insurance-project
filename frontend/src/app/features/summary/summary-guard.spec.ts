@@ -48,13 +48,10 @@ describe('US-03 summary guard (unit)', () => {
     TestBed.resetTestingModule();
   });
 
-  // BUG: summaryGuard calls inject() after `await plansGuard(...)`, outside the injection context (NG0203),
-  // so the guard rejects whenever step 1 is valid. See TW-BUG-01.
   it('US-03-AC-11 summary guard allows entry when step 1 is valid and a plan is selected', async () => {
     await expect(run('plan-1')).resolves.toBe(true);
   });
 
-  // BUG: same cause as above (TW-BUG-01).
   it('US-03-AC-11 summary guard redirects to planes when step 1 is valid and no plan is selected', async () => {
     const result = await run(null);
     expect(result).toBeInstanceOf(UrlTree);

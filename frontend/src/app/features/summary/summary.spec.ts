@@ -174,6 +174,38 @@ describe('US-03 summary (unit)', () => {
     expect(set.mock.calls[0][0].quoteNumber).toMatch(/^COT-XX-20261123-[A-Z0-9]{6}$/);
   });
 
+  it('US-03-AC-02 terms from Strapi per country gate the pay button', async () => {
+    const { fixture, el } = await setup(country({ termsTitle: 'T-XX', termsBody: 'BODY-XX' }));
+    expect(el.querySelector('[data-testid="terms"]')?.textContent).toContain('T-XX');
+    expect(el.querySelector('[data-testid="terms-body"]')?.textContent?.trim()).toBe('BODY-XX');
+    expect(button(el, 'PAY').disabled).toBe(true);
+    (el.querySelector('#terms-accept') as HTMLInputElement).click();
+    fixture.detectChanges();
+    expect(button(el, 'PAY').disabled).toBe(false);
+  });
+
+  it('US-03-AC-02 unchecking terms while the gateway is open blocks approval', async () => {
+    const { fixture, el, set } = await setup(country(), 0);
+    document.body.appendChild(el); // focus assertions need an attached element
+    const box = el.querySelector('#terms-accept') as HTMLInputElement;
+    box.click();
+    fixture.detectChanges();
+    button(el, 'PAY').click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="gateway"]')).not.toBeNull();
+    box.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(box.checked).toBe(false);
+    expect(el.querySelector('[data-testid="gateway"]')).toBeNull();
+    expect(button(el, 'APPROVE')).toBeUndefined();
+    expect(button(el, 'PAY').disabled).toBe(true);
+    // BUG: TW-BUG-02 Pagar is disabled when unchecked, so focus() on it is a no-op and focus falls to body
+    expect(document.activeElement).toBe(button(el, 'PAY'));
+    expect(set).not.toHaveBeenCalled();
+  });
+
   it('US-03-AC-14 missing terms disable payment', async () => {
     const { el } = await setup(country({ termsBody: '' }));
     expect(el.querySelector('[data-testid="terms-unavailable"]')?.textContent).toContain('NO-TERMS');

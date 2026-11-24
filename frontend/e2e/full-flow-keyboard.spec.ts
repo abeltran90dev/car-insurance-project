@@ -25,7 +25,6 @@ async function tabTo(page: Page, label: string, match: (a: Awaited<ReturnType<ty
 
 const button = (text: string) => (a: Awaited<ReturnType<typeof activeInfo>>) => a.tag === 'BUTTON' && a.text === text;
 
-// BUG: TW-BUG-01 (summary guard breaks step 2 -> step 3)
 test('US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only', async ({ page }) => {
   const year = String(new Date().getFullYear() - 2);
 
