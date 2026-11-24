@@ -1,0 +1,1287 @@
+
+> /clear
+
+> <ide_opened_file>The user opened the file
+  c:\Proyectos\car-insurance-project\docs\ai-sessions\2026-11-23-US-01.txt in
+  the IDE. This may or may not be related to the current
+  task.</ide_opened_file>
+
+> Read docs/prompts/story-cycle-prompt.md and run it for US-02.
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+● Branch feat/US-02-plan-list created; spec v3 Approved, ADR-001..004 Accepted,
+  so the gate allows writes. Running the implementer.
+
+● implementer(Implement US-02 plan list)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● I've started step 2: the implementer is building the US-02 P1 criteria on
+  feat/US-02-plan-list and is still running. When it finishes I'll run the
+  test-writer, then the reviewer, and stop at HC3 with the findings table for
+  your decision on each one.
+
+› Message from implementer
+  US-02 P1 is implemented against SPEC-US-02 v3 on `feat/US-02-plan-list`. `ng
+  build` passes and the existing unit suite passes (75 of 75). I did not run the
+  app against Strapi, so the plan list has not been exercised in a browser.
+
+  **Commits**
+  - `e4a233f` feat(US-02): add pricing function, plan model and plans API (Refs:
+  SPEC-US-02, ADR-001, ADR-003)
+  - `43e7955` feat(US-02): guard plans step on valid step 1 data (Refs:
+  SPEC-US-02, ADR-004)
+  - `a4c7483` feat(US-02): plan list step with selection and states (Refs:
+  SPEC-US-02, ADR-001, ADR-002, ADR-004)
+
+  All three end with the `Co-Authored-By: Claude Opus 5.5` trailer you asked
+  for. The system attribution reminder said Sonnet 5.5; I followed your
+  instruction. Say if you want them amended.
+
+  **Files** (all under `C:\Proyectos\car-insurance-project\frontend\src\app\`)
+  - `features/plan-list/pricing.ts`: `computeFinalPrice(basePrice,
+  vehicleYear|null, today)` and `ageFactor`. The age factors are one documented
+  constant. A null or non-integer year gives factor 1 and a console warning.
+  - `features/plan-list/plan.ts`: `Plan` model and `toPlans`, which maps
+  `basePrice` with `Number()`. It drops and warns on plans with a wrong currency
+  or a base price that is not finite or not above 0.
+  - `features/plan-list/plan-list-api.ts`: the plans request exactly as in spec
+  §4.2.
+  - `features/plan-list/plans-guard.ts`: redirects to `/{cc}/datos` when step 1
+  is not valid. It uses the existing `isStep1Valid`. With empty stored values it
+  redirects without any request, and if the fields request fails it also
+  redirects.
+  - `features/plan-list/plan-list.ts`, `plan-list.html`, `plan-list.css`: the
+  step component. It covers loading, error with retry, empty, and success, with
+  native radios in a fieldset. It gives the first recommended plan a badge and a
+  dashed border. The selected card gets a thick solid border and a check mark.
+  "Continuar" is disabled until a plan from the current list is selected, and
+  "Volver" is always shown. A stored plan that is no longer offered is cleared
+  silently. All text is interpolated as plain text, and empty coverages or
+  benefits lists omit their heading.
+  - `app.routes.ts`: the `planes` route now uses `PlanList` with `plansGuard`,
+  replacing the placeholder.
+
+  I did not touch `cms/`. It already has the `plan` content type, the seed plans
+  for CO and CL (including "Plan Antiguo" inactive and "Plan Borrador" draft),
+  the `plans.*` and `common.*` copy keys, and `api::plan.plan.find` for Public.
+
+  **P1 ACs implemented:** 01, 02, 03, 04, 05, 09, 10, 12, 16, 17, 18. I
+  confirmed this list against the priority column.
+  - AC-19 (public write denied with 401 or 403) needs no frontend work. Public
+  only has `find` on `plan`, so the test-writer needs to cover it against a
+  running Strapi.
+  - The vehicle year field is found by its `vehicleYear` validator, per GAP-12.
+  The component fetches the form fields alongside the plans to get that key, so
+  the plans page makes one extra GET to `/form-fields`.
+
+  **P2 ACs covered along the way:** 06 (price formatted with `Intl.NumberFormat`
+  to 0 decimals), 07 (only the first recommended plan is highlighted), 08
+  (native radios give keyboard selection), 11 (selection persists through the
+  store, and the vehicle year gives the price), 13 (price recomputed on every
+  render), 14 (loading state), 15 (error state with retry; the 10 s timeout
+  comes from `StrapiClient`), and 20 (focus moves to the `h1` after loading).
+  - AC-21 (responsive layout) has the CSS: one column up to 1023 px and three
+  columns from 1024 px. The 44 px touch targets and the layout have not been
+  verified.
+  - None of these P2 ACs have tests or a manual check yet.
+
+  **Deviations and open questions:** none found in the spec.
+  - The pending check on whether Strapi returns `decimal` as a string is handled
+  by `Number()`. I did not check the actual Strapi response.
+  - No lint script was run.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Implement US-02 plan list" finished · 2m 1s
+
+● Implementer done: 3 commits, build green, 75/75 existing unit tests pass. All
+  P1 ACs are implemented except AC-19, which needs no frontend change and gets a
+  test instead. Running the test-writer now.
+
+● test-writer(Write and run US-02 P1 tests)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● I've started step 3: the test-writer is writing tests for the 12 P1 criteria
+  and running the unit and e2e suites. It's still running, and I'll go to the
+  review once it reports.
+
+  Two things from the implementer to know now:
+  - No real data checked yet: the plan list hasn't been run against Strapi. The
+    test-writer rebuilds the frontend image to run the e2e tests.
+  - Also covered: the P2 criteria 06, 07, 08, 11, 13, 14, 15 and 20 were
+    implemented along the way, but they have no tests. AC-21 (responsive layout)
+    has the CSS but hasn't been checked.
+
+› Message from test-writer
+  All 12 P1 ACs have automated tests. Every test passes and I found no bugs, so
+  there are no TW-BUGs.
+
+  **Commit:** 6952188 `test(US-02): P1 unit and e2e tests for plan list`. It
+  carries the `Refs: SPEC-US-02` trailer and the Co-Authored-By line you
+  specified. I changed no production code.
+
+  **Test files**
+  - `c:\Proyectos\car-insurance-project\frontend\src\app\features\plan-list\plan
+  -list.spec.ts` (unit, fixed clock 2026-06-15, Strapi mocked)
+  - `c:\Proyectos\car-insurance-project\frontend\e2e\us-02-plan-list.spec.ts`
+  (e2e)
+
+  **Results**
+  - **Unit:** `npm test` gave 91/91 passed across 9 files. That is the whole
+  suite, including the new US-02 tests.
+  - **E2E:** `E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test` gave 19/19
+  passed. That is the 7 existing US-01/smoke tests plus 12 new US-02 tests, so
+  there are no US-01 regressions.
+  - **Docker:** I rebuilt the frontend image with the `docker build` and `docker
+  compose up -d --no-build` workaround, so the e2e ran against the feat branch.
+  - **Test fix:** my first e2e run had one failure in the AC-02 CL test. A
+  `getByRole` name match for "Plan Full" also matched "Plan Full Plus". That was
+  a defect in my test, fixed with `exact: true`.
+
+  **AC to test name**
+  - **AC-01 (e2e, co and cl):** `US-02-AC-01 shows only active published plans
+  in order (co|cl)`. It checks the exact plan names and order, and that "Plan
+  Antiguo" and "Plan Borrador" are absent.
+  - **AC-02 (e2e, co and cl):** `US-02-AC-02 highlights the recommended plan
+  (co|cl)`. It checks one badge, on the plan Strapi flags as recommended, and
+  that the badge is in the radio's accessible description.
+  - **AC-03 (e2e):** `US-02-AC-03 selects a plan and continues to summary
+  (co|cl)`, plus `...after completing the real step 1 form (co)`, which fills
+  the real form and ends on `/co/resumen`.
+  - **AC-04 (unit and e2e):** the unit test is `US-02-AC-04 shows empty state
+  when no plans`. The e2e is `...shows empty state when no plans (co, mocked)`,
+  using a route mock.
+  - **AC-05 (unit):** `US-02-AC-05 computes final price by vehicle age (year Y,
+  base B -> F)`, one test for each of the 7 table rows in the spec.
+  - **AC-09 (unit and e2e):** `US-02-AC-09 disables continue until a plan is
+  selected` (unit), and `...(co)` (e2e).
+  - **AC-10 (e2e, cl):** `US-02-AC-10 redirects to step 1 without valid data
+  (cl)`. It also asserts that no `/api/plans` request is made.
+  - **AC-12 (unit):** `US-02-AC-12 clears selection of a plan no longer
+  offered`, plus a companion test that a still-offered selection is kept.
+  - **AC-16 (unit):** `US-02-AC-16 hides plans with wrong currency or invalid
+  price`. It covers the mapper with warnings for Plan X and Plan Y, plus a
+  rendered-component variant.
+  - **AC-17 (unit):** `US-02-AC-17 uses factor 1 when vehicle year is missing`.
+  There is a pure-function test and a component test where no field has the
+  `vehicleYear` validator. Both assert a console warning.
+  - **AC-18 (unit):** `US-02-AC-18 renders CMS text as plain text`. The literal
+  text shows on the card, no `img` element is created, and there is no
+  "Beneficios" heading for an empty benefits list.
+  - **AC-19 (e2e API):** `US-02-AC-19 public write to plans is denied with 401
+  or 403`. It follows the US-01 AC-15 pattern: POST, PUT and DELETE return 401
+  or 403, and GET returns 200.
+
+  **Notes**
+  - **Step 1 seeding:** most US-02 e2e tests seed a valid step 1 into
+  `sessionStorage` (key `quote:v1:CC`, ADR-004 shape) instead of filling the
+  form. One test (AC-03, co) goes through the real form.
+  - **Test data:** the e2e hard-codes the seed plan names from the spec (AC-01),
+  the seed copy strings "Recomendado" and the empty-state message, and
+  fictitious step 1 values. The test comments say they are seed data.
+
+  **Not covered:** nothing in the P1 scope. I did not write the P2 ACs (06, 07,
+  08, 11, 13, 14, 15, 20, 21), as instructed. Those are left for the HC4 manual
+  check or a later pass.
+
+  **Environment:** `docs/ai-sessions/` files were already untracked and I did
+  not touch them.
+
+● Tests are green: 91/91 unit and 19/19 e2e, with no TW-BUGs. Next I'm writing
+  the review input file.
+
+● Bash(BASE=$(git merge-base main HEAD); HEAD_SHA=$(git rev-parse HEAD); { echo
+      "# US-02 review input  base=$BASE head=$HEAD_SHA"; echo "## Commits"; git
+      log --oneline…)
+  ⎿  1 file changed (binary, mode only or too large to show)
+     docs\reviews\US-02.diff
+
+● Agent "Write and run US-02 P1 tests" finished · 2m 19s
+
+● reviewer(Review US-02 changes)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● The tests are done and the reviewer is now running.
+
+  - Tests: commit 6952188 adds tests for all 12 P1 criteria. Unit tests pass
+    91/91 and e2e tests pass 19/19, including the US-01 tests.
+  - Bugs: none reported by the test-writer.
+  - Review input: written to docs/reviews/US-02.diff.
+
+  When the reviewer finishes I'll save its report as
+  docs/reviews/REVIEW-US-02.md and stop at HC3 with the findings table for your
+  decisions.
+
+› Message from reviewer
+  # REVIEW-US-02 – Plan list
+
+  | Field | Value |
+  |-------|-------|
+  | Story | [US-02](../user-stories/US-02.md) |
+  | Spec | [SPEC-US-02](../specs/SPEC-US-02.md) (version 3) |
+  | ADRs checked | ADR-001, ADR-002, ADR-003, ADR-004, ADR-005 |
+  | Branch | `feat/US-02-plan-list` |
+  | Commit range | `0027b69..6952188` |
+  | Review input | [US-02.diff](US-02.diff) (changed files + diff, written by
+  the main session) |
+  | Test summary reviewed | unit: 91 passed / 0 failed · e2e: 19 passed / 0
+  failed (as reported by test-writer; not run by the reviewer) |
+  | Reviewer | reviewer subagent (Claude Code, opus), read-only |
+  | Review date | 2026-11-23 |
+  | Human triage (HC3) | Andres Beltran, YYYY-MM-DD |
+
+  ## Findings
+
+  Source: `review` (found by the reviewer) · `test-writer` (bug reported by the
+  test-writer; every one must be logged here).
+  Severity: `blocker` (violates an AC, a non-negotiable or security; must fix) ·
+  `major` (likely bug or significant deviation) · `minor` (quality issue with
+  low risk) · `nit` (style).
+
+  Human decision (HC3): `fix now` · `accept risk: <reason>` · `out of scope:
+  <reason>`.
+  Status: `Open` · `Resolved` · `Accepted` · `Deferred`.
+
+  | ID | Source | Severity | File:line | Finding | Recommendation | Human
+  decision | Resolution commit | Status |
+  |----|--------|----------|-----------|---------|----------------|-------------
+  ---|-------------------|--------|
+  | REVIEW-US-02-F01 | review | major |
+  `frontend/src/app/features/plan-list/plan-list.ts:845-848`,
+  `plan-list.html:6-8`, `plans-guard.ts:17-19` | **"Reintentar" does nothing
+  when the country could not be resolved.** If Strapi is down on a deep link or
+  reload of `/{cc}/planes`, `countryMatchGuard` returns `true` on `'error'`,
+  `plansGuard` returns `true` because `country` is null, and the template shows
+  the technical fallback with a retry button (`!country()` branch). `retry()`
+  only calls `this.resource.reload()`. The resource's `params` is
+  `this.country() ?? undefined`, so the resource is `idle` and `reload()` is a
+  no-op. The country is never re-resolved, so the user is stuck until a manual
+  page reload. This breaks the GAP-04 / §6 error state ("Reintentar" repeats the
+  request). `ApplicantForm.retry()` (`applicant-form.ts:158-175`) already
+  handles this case with `resolveAndActivate`. Related: because `plansGuard` let
+  the navigation through with no country, a fixed retry would show plans
+  without the GAP-05 step 1 check ever running. | In `PlanList.retry()`, when
+  `country()` is null, resolve the country from the parent route param with
+  `resolveAndActivate` (same as the applicant form). Then re-run navigation
+  (`navigateByUrl(router.url, { onSameUrlNavigation: 'reload' })`) so
+  `plansGuard` checks step 1 before plans are shown. Add a unit test for retry
+  with no country. | | | Open |
+  | REVIEW-US-02-F02 | review | minor |
+  `frontend/src/app/features/plan-list/plan-list.html:9-11, 14-18`,
+  `plan-list.html:14` | **Live-region semantics differ from §7 / GAP-23.** (a)
+  The `aria-live="polite"` containers for loading and empty are created at the
+  same moment as their text. Many screen readers don't announce a live region
+  that is inserted already filled, so loading and empty may go unannounced. (b)
+  The error message uses `role="alert"` (assertive), but §7 says
+  loading/empty/error are announced "via `aria-live=\"polite\"`". Loading and
+  empty are P2 (AC-14) and the error state is part of AC-15 (P2), so this is a
+  behavior defect, not a missing test. | Render one persistent `<div
+  aria-live="polite">` outside the `@if` chain, and put the loading, empty and
+  error texts inside it. Use polite rather than `role="alert"` for the error, or
+  record the deviation in the spec through the change loop. |  | | Open |
+  | REVIEW-US-02-F03 | review | minor |
+  `frontend/src/app/features/plan-list/plan-list.ts:836-839`,
+  `pricing.ts:1003-1005`, `plan-list.ts:827-834` | **Console-warning flood.**
+  `price(plan)` is a template method, so it runs on every change detection for
+  every card. When the vehicle year is unavailable (GAP-12), `ageFactor` logs
+  `console.warn` on every call: 3 plans × every CD cycle. `text()` also warns
+  for a missing copy key on every call. Behavior is correct (AC-17 passes), but
+  the logs are noisy and the repeated template work is wasted. | Compute prices
+  once in a `computed` (for example `pricedPlans = computed(() => plans().map(p
+  => ({...p, price: format(computeFinalPrice(...))})))`). Warn once about a
+  missing year in the component (in the `vehicleYear` computed or an effect),
+  not inside the pure function per call, or keep the warn in the pure function
+  and call it once per render set. Warn once per missing copy key (memoize). | |
+  | Open |
+  | REVIEW-US-02-F04 | review | minor |
+  `frontend/src/app/features/plan-list/plan-list.ts:766-775`,
+  `plans-guard.ts:968` | **Plan list depends on `/form-fields`, which is fetched
+  twice.** The guard already fetches `/form-fields` to validate step 1. The
+  component fetches it again in a `forkJoin` with `/plans` to find the
+  `vehicleYear` key. Two effects: (1) a redundant request on every arrival; (2)
+  if `/form-fields` fails while `/plans` succeeds, the whole step goes to the
+  plans error state. GAP-12 intends only that a missing year field falls back to
+  factor 1.00, not that the plan list becomes unavailable. | Cache the fields
+  per country in `ApplicantFormApi` (for example `shareReplay` per code) so the
+  guard and the component share one response. Optionally map a `/form-fields`
+  failure in the component to `yearKey: null` (factor 1.00 + warning) instead of
+  failing the plans resource. | | | Open |
+  | REVIEW-US-02-F05 | review | minor |
+  `frontend/e2e/us-02-plan-list.spec.ts:95-112` | **AC-02 e2e test reads its
+  expected value from the system under test.** The recommended plan name comes
+  from an unsorted Strapi query (`filters[recommended][$eq]=true`, no `sort`)
+  and the test takes `data[0]`. It doesn't assert the spec's concrete
+  expectation (CO "Plan Estándar", CL "Plan Full"). If the seed ever had two
+  recommended plans, `data[0]` might not be the first by `order` (GAP-09), and
+  the test could pass or fail for the wrong reason. The test also doesn't check
+  that the badge text comes from copy for the specific card beyond the regex. |
+  Assert the seed's recommended plan by name, as the test already does for
+  `SEED_PLANS` (for example `RECOMMENDED = { co: 'Plan Estándar', cl: 'Plan
+  Full' }`), and drop the extra API call. | | | Open |
+  | REVIEW-US-02-F06 | review | nit |
+  `frontend/src/app/features/plan-list/plan-list.html:24` | Unused template
+  variable `let i = $index` in the `@for`. Dead code. | Remove `; let i =
+  $index`. | | | Open |
+
+  ## Test-writer bugs
+
+  | Bug (as reported in the test run summary) | AC | Failing test | Finding ID |
+  |-------------------------------------------|----|--------------|------------|
+  | None reported | | | |
+
+  None reported. The test-writer named one defect in its own test (a non-exact
+  `getByRole` name match for "Plan Full" vs "Plan Full Plus") and fixed it in
+  the test itself. It isn't a production bug, so no finding is logged. The fix
+  is visible in `frontend/e2e/us-02-plan-list.spec.ts:111,121-122` (`exact:
+  true`).
+
+  ## Spec conformance
+
+  | AC ID | Implemented | Tested (test name) | Notes |
+  |-------|-------------|--------------------|-------|
+  | US-02-AC-01 (P1) | yes | `US-02-AC-01 shows only active published plans in
+  order (co/cl)` | Query matches §4.2 exactly (filters, two-key sort, explicit
+  populate, pageSize 100, no status, no auth). |
+  | US-02-AC-02 (P1) | yes | `US-02-AC-02 highlights the recommended plan
+  (co/cl)` | Badge id is in the radio's `aria-describedby`. Test quality: F05. |
+  | US-02-AC-03 (P1) | yes | `US-02-AC-03 selects a plan and continues to
+  summary (co/cl)`, `US-02-AC-03 selects a plan after completing the real step 1
+  form (co)` | Selected style is a 4px solid border plus a check mark, so not
+  color only. |
+  | US-02-AC-04 (P1) | yes | `US-02-AC-04 shows empty state when no plans`
+  (unit), `US-02-AC-04 shows empty state when no plans (co, mocked)` (e2e) |
+  Live-region note: F02. |
+  | US-02-AC-05 (P1) | yes | `US-02-AC-05 computes final price by vehicle age
+  (...)` ×7 | All 7 spec rows, fixed clock. |
+  | US-02-AC-06 (P2) | yes | not automated (P2) | `Intl.NumberFormat` with
+  country locale and currency and 0/0 fraction digits; period and label from
+  copy. |
+  | US-02-AC-07 (P2) | yes | not automated (P2) | `recommendedId` = first
+  `recommended` in the ordered list. |
+  | US-02-AC-08 (P2) | yes | not automated (P2) | Native radios with a shared
+  `name` inside a `fieldset`/`legend`. |
+  | US-02-AC-09 (P1) | yes | `US-02-AC-09 disables continue until a plan is
+  selected` (unit + e2e) | |
+  | US-02-AC-10 (P1) | yes | `US-02-AC-10 redirects to step 1 without valid data
+  (cl)` | Guard uses the step 1 engine (`isStep1Valid`). Gap when the country
+  is unresolved: F01. |
+  | US-02-AC-11 (P2) | yes | not automated (P2) | Only `planDocumentId` is
+  persisted (ADR-004); no price stored. |
+  | US-02-AC-12 (P1) | yes | `US-02-AC-12 clears selection of a plan no longer
+  offered`, `US-02-AC-12 keeps selection of a plan that is still offered` | |
+  | US-02-AC-13 (P2) | yes | not automated (P2) | Price recomputed from
+  `store.values()` on each render. |
+  | US-02-AC-14 (P2) | yes | not automated (P2) | See F02. |
+  | US-02-AC-15 (P2) | partial | not automated (P2) | Works when the country is
+  resolved (10 s timeout in `StrapiClient`). Retry is dead when the country is
+  unresolved: F01. |
+  | US-02-AC-16 (P1) | yes | `US-02-AC-16 hides plans with wrong currency or
+  invalid price` (mapper + rendered) | `Number()` mapping covers decimals that
+  arrive as strings. |
+  | US-02-AC-17 (P1) | yes | `US-02-AC-17 uses factor 1 when vehicle year is
+  missing`, `US-02-AC-17 uses factor 1 when no step 1 field uses the vehicleYear
+  validator` | Warning noise: F03. |
+  | US-02-AC-18 (P1) | yes | `US-02-AC-18 renders CMS text as plain text` |
+  Interpolation only; no `innerHTML` anywhere in the diff. |
+  | US-02-AC-19 (P1) | yes | `US-02-AC-19 public write to plans is denied with
+  401 or 403` | Asserts status ∈ {401, 403} for POST/PUT/DELETE and 200 for GET
+  (ADR-003). |
+  | US-02-AC-20 (P2) | yes | not automated (P2) | Focus goes to the `h1`
+  (`tabindex="-1"`) after the first successful load and again after a successful
+  retry. |
+  | US-02-AC-21 (P2) | yes | not automated (P2, manual at HC4) | Single column
+  by default; 3 columns at ≥ 1024 px; radio label `min-height: 44px`. |
+
+  ## Summary
+
+  - Overall: the implementation follows SPEC-US-02 v3 closely. The Strapi
+  request matches §4.2. Plans, copy, currency and locale all come from Strapi.
+  The pricing function is pure, documented, and keeps the factors in code as
+  GAP-13 decided. Invalid plans are filtered with warnings. Every P1 AC has a
+  test named with its ID. The one substantive defect is F01: a dead "Reintentar"
+  in the unresolved-country error path, which also bypasses the step 1 guard
+  once fixed naively. The other findings are minor robustness, a11y and
+  test-quality points.
+  - Areas checked with no findings:
+    - **ADRs & CLAUDE.md:** single build, no NgModules (standalone, OnPush,
+  signals, built-in control flow), no auth header or write token (GET-only
+  `StrapiClient`), wizard state limited to `planDocumentId` per ADR-004, `cms/`
+  untouched.
+    - **Security:** no `innerHTML`, no secrets, AC-19 test present.
+    - **Fictitious data:** e2e step 1 values use `example.test` emails and
+  placeholder documents and plates.
+    - **Code quality:** no `any`.
+    - **Process:** the branch `feat/US-02-plan-list` matches an Approved spec
+  (v3), no scaffold-branch feature code, commit subjects follow Conventional
+  Commits with the `US-02` scope. `Refs:` trailers can't be verified from the
+  `--oneline` commit list in the review input.
+  - Re-review after fixes: pending.
+
+● Write(docs\reviews\REVIEW-US-02.md)
+  ⎿  Wrote 76 lines to docs\reviews\REVIEW-US-02.md
+       1 # REVIEW-US-02 – Plan list
+       2
+       3 | Field | Value |
+       4 |-------|-------|
+       5 | Story | [US-02](../user-stories/US-02.md) |
+       6 | Spec | [SPEC-US-02](../specs/SPEC-US-02.md) (version 3) |
+       7 | ADRs checked | ADR-001, ADR-002, ADR-003, ADR-004, ADR-005 |
+       8 | Branch | `feat/US-02-plan-list` |
+       9 | Commit range | `0027b69..6952188` |
+      10 | Review input | [US-02.diff](US-02.diff) (changed files + diff,
+     … +67 lines (~11 KB) (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Review US-02 changes" finished · 1m 39s
+
+● HC3: US-02 review findings, waiting for your decision
+
+  The review is in docs/reviews/REVIEW-US-02.md, committed together with its
+  input docs/reviews/US-02.diff as f615015. There are 6 findings: none blocking,
+  1 major, 4 minor and 1 nit. The test-writer reported no bugs, so none of the
+  findings come from it. Every P1 criterion is implemented and has a test.
+
+  ID: F01
+  Sev.: major
+  Finding: When Strapi is down on a direct load of /{cc}/planes, "Reintentar"
+    does nothing. The country never gets resolved again, so the user is stuck
+    until they reload the page. Once fixed, the page would also skip the check
+    that step 1 is valid.
+  Recommendation: Resolve the country on retry, the same way the step 1 form
+    does, then re-run navigation so the step 1 check applies. Add a unit test.
+  Proposed: fix
+  ────────────────────────────────────────
+  ID: F02
+  Sev.: minor
+  Finding: Screen readers may not announce the loading and empty messages. The
+    error message uses role="alert", which interrupts, while the spec asks for
+    the polite kind.
+  Recommendation: Use one polite live region that is always on the page and
+    holds all three messages.
+  Proposed: accept: P2 (AC-14/15), small accessibility risk, checked by hand
+    at HC4
+  ────────────────────────────────────────
+  ID: F03
+  Sev.: minor
+  Finding: The price is recalculated on every screen update, and when the
+    vehicle year is missing the console fills with repeated warnings.
+  Recommendation: Compute the prices once and warn once.
+  Proposed: accept: console noise only, the behavior is correct
+  ────────────────────────────────────────
+  ID: F04
+  Sev.: minor
+  Finding: /form-fields is fetched twice on arrival. If only that request
+    fails, the whole plans page shows the error state.
+  Recommendation: Cache the fields per country, and treat a failed fields
+    request as "no vehicle year".
+  Proposed: accept: rare failure case, the user can still retry
+  ────────────────────────────────────────
+  ID: F05
+  Sev.: minor
+  Finding: The AC-02 e2e test reads the expected recommended plan from Strapi
+    instead of naming it.
+  Recommendation: Assert the plan by name: CO "Plan Estándar", CL "Plan Full".
+  Proposed: accept: the current seed has one recommended plan per country
+  ────────────────────────────────────────
+  ID: F06
+  Sev.: nit
+  Finding: The template declares let i = $index and never uses it.
+  Recommendation: Remove it.
+  Proposed: accept: style only
+
+  The proposal follows the default: fix the major finding and accept the minor
+  ones with the reasons above. F05 and F06 each take about a minute to fix, so
+  you could add them to the fix list.
+
+  Reply with a decision per finding: fix, accept: <reason> or out of scope.
+
+> HC3 decisions for US-02:
+  - F01: fix.
+  - F02: fix (overriding the proposal). Accessibility is an explicit
+  requirement and the change is small; consistent with US-01 F04. One
+  always-present polite live region for loading/empty/error.
+  - F03: accept: console noise only, behavior is correct.
+  - F04: accept: rare failure case, the user can retry.
+  - F05: fix: assert the recommended plan by name so the test does not trust
+  the source it is testing.
+  - F06: fix: trivial cleanup.
+
+● Recording the decisions in the review report, then starting the fix round.
+
+● Bash(f=docs/reviews/REVIEW-US-02.md
+      set_dec(){ sed -i "/^| REVIEW-US-02-$1 /s/| *| *| Open |\$/| $2 | | $3 |/"
+      "$f"; }…)
+  ⎿  Updated docs\reviews\REVIEW-US-02.md +6 -6
+      11  | Test summary reviewed | unit: 91 passed / 0 failed · e2e: 19
+          passed / 0 failed (as reported by test-writer; not run by the r
+          eviewer) |
+      12  | Reviewer | reviewer subagent (Claude Code, opus), read-only |
+      13  | Review date | 2026-11-23 |
+      14 -| Human triage (HC3) | Andres Beltran, YYYY-MM-DD |            
+      14 +| Human triage (HC3) | Andres Beltran, 2026-11-23 |            
+      15 
+      16  ## Findings
+      17 
+     ...
+      23 
+      24  | ID | Source | Severity | File:line | Finding | Recommendation
+           | Human decision | Resolution commit | Status |
+      25  |----|--------|----------|-----------|---------|---------------
+          -|----------------|-------------------|--------|
+      26 -| REVIEW-US-02-F01 | review | major | `frontend/src/app/feature
+         -s/plan-list/plan-list.ts:845-848`, `plan-list.html:6-8`, `plans
+         --guard.ts:17-19` | **"Reintentar" does nothing when the country
+         - could not be resolved.** If Strapi is down on a deep link or r
+         -eload of `/{cc}/planes`, `countryMatchGuard` returns `true` on 
+         -`'error'`, `plansGuard` returns `true` because `country` is nul
+         -l, and the template shows the technical fallback with a retry b
+         -utton (`!country()` branch). `retry()` only calls `this.resourc
+         -e.reload()`. The resource's `params` is `this.country() ?? unde
+         -fined`, so the resource is `idle` and `reload()` is a no-op. Th
+         -e country is never re-resolved, so the user is stuck until a ma
+         -nual page reload. This breaks the GAP-04 / §6 error state ("Rei
+         -ntentar" repeats the request). `ApplicantForm.retry()` (`applic
+         -ant-form.ts:158-175`) already handles this case with `resolveAn
+         -dActivate`. Related: because `plansGuard` let the navigation th
+         -rough with no country, a fixed retry would show plans without t
+         -he GAP-05 step 1 check ever running. | In `PlanList.retry()`, w
+         -hen `country()` is null, resolve the country from the parent ro
+         -ute param with `resolveAndActivate` (same as the applicant form
+         -). Then re-run navigation (`navigateByUrl(router.url, { onSameU
+         -rlNavigation: 'reload' })`) so `plansGuard` checks step 1 befor
+         -e plans are shown. Add a unit test for retry with no country. |
+         - | | Open |                                                    
+      26 +| REVIEW-US-02-F01 | review | major | `frontend/src/app/feature
+         +s/plan-list/plan-list.ts:845-848`, `plan-list.html:6-8`, `plans
+         +-guard.ts:17-19` | **"Reintentar" does nothing when the country
+         + could not be resolved.** If Strapi is down on a deep link or r
+         +eload of `/{cc}/planes`, `countryMatchGuard` returns `true` on 
+         +`'error'`, `plansGuard` returns `true` because `country` is nul
+         +l, and the template shows the technical fallback with a retry b
+         +utton (`!country()` branch). `retry()` only calls `this.resourc
+         +e.reload()`. The resource's `params` is `this.country() ?? unde
+         +fined`, so the resource is `idle` and `reload()` is a no-op. Th
+         +e country is never re-resolved, so the user is stuck until a ma
+         +nual page reload. This breaks the GAP-04 / §6 error state ("Rei
+         +ntentar" repeats the request). `ApplicantForm.retry()` (`applic
+         +ant-form.ts:158-175`) already handles this case with `resolveAn
+         +dActivate`. Related: because `plansGuard` let the navigation th
+         +rough with no country, a fixed retry would show plans without t
+         +he GAP-05 step 1 check ever running. | In `PlanList.retry()`, w
+         +hen `country()` is null, resolve the country from the parent ro
+         +ute param with `resolveAndActivate` (same as the applicant form
+         +). Then re-run navigation (`navigateByUrl(router.url, { onSameU
+         +rlNavigation: 'reload' })`) so `plansGuard` checks step 1 befor
+         +e plans are shown. Add a unit test for retry with no country. |
+         + fix now | | Open |                                            
+      27  | REVIEW-US-02-F02 | review | minor | `frontend/src/app/feature
+          s/plan-list/plan-list.html:9-11, 14-18`, `plan-list.html:14` |
+          **Live-region semantics differ from §7 / GAP-23.** (a) The `ari
+          a-live="polite"` containers for loading and empty are created a
+          t the same moment as their text. Many screen readers don't anno
+          unce a live region that is inserted already filled, so loading
+          and empty may go unannounced. (b) The error message uses `role=
+          "alert"` (assertive), but §7 says loading/empty/error are annou
+          nced "via `aria-live=\"polite\"`". Loading and empty are P2 (AC
+          -14) and the error state is part of AC-15 (P2), so this is a be
+          havior defect, not a missing test. | Render one persistent `<di
+          v aria-live="polite">` outside the `@if` chain, and put the loa
+          ding, empty and error texts inside it. Use polite rather than `
+          role="alert"` for the error, or record the deviation in the spe
+          c through the change loop. |  | | Open |
+      28 -| REVIEW-US-02-F03 | review | minor | `frontend/src/app/feature
+         -s/plan-list/plan-list.ts:836-839`, `pricing.ts:1003-1005`, `pla
+         -n-list.ts:827-834` | **Console-warning flood.** `price(plan)` i
+         -s a template method, so it runs on every change detection for e
+         -very card. When the vehicle year is unavailable (GAP-12), `ageF
+         -actor` logs `console.warn` on every call: 3 plans × every CD cy
+         -cle. `text()` also warns for a missing copy key on every call. 
+         -Behavior is correct (AC-17 passes), but the logs are noisy and 
+         -the repeated template work is wasted. | Compute prices once in 
+         -a `computed` (for example `pricedPlans = computed(() => plans()
+         -.map(p => ({...p, price: format(computeFinalPrice(...))})))`). 
+         -Warn once about a missing year in the component (in the `vehicl
+         -eYear` computed or an effect), not inside the pure function per
+         - call, or keep the warn in the pure function and call it once p
+         -er render set. Warn once per missing copy key (memoize). | | | 
+         -Open |                                                         
+      29 -| REVIEW-US-02-F04 | review | minor | `frontend/src/app/feature
+         -s/plan-list/plan-list.ts:766-775`, `plans-guard.ts:968` | **Pla
+         -n list depends on `/form-fields`, which is fetched twice.** The
+         - guard already fetches `/form-fields` to validate step 1. The c
+         -omponent fetches it again in a `forkJoin` with `/plans` to find
+         - the `vehicleYear` key. Two effects: (1) a redundant request on
+         - every arrival; (2) if `/form-fields` fails while `/plans` succ
+         -eeds, the whole step goes to the plans error state. GAP-12 inte
+         -nds only that a missing year field falls back to factor 1.00, n
+         -ot that the plan list becomes unavailable. | Cache the fields p
+         -er country in `ApplicantFormApi` (for example `shareReplay` per
+         - code) so the guard and the component share one response. Optio
+         -nally map a `/form-fields` failure in the component to `yearKey
+         -: null` (factor 1.00 + warning) instead of failing the plans re
+         -source. | | | Open |                                           
+      30 -| REVIEW-US-02-F05 | review | minor | `frontend/e2e/us-02-plan-
+         -list.spec.ts:95-112` | **AC-02 e2e test reads its expected valu
+         -e from the system under test.** The recommended plan name comes
+         - from an unsorted Strapi query (`filters[recommended][$eq]=true
+         -`, no `sort`) and the test takes `data[0]`. It doesn't assert t
+         -he spec's concrete expectation (CO "Plan Estándar", CL "Plan Fu
+         -ll"). If the seed ever had two recommended plans, `data[0]` mig
+         -ht not be the first by `order` (GAP-09), and the test could pas
+         -s or fail for the wrong reason. The test also doesn't check tha
+         -t the badge text comes from copy for the specific card beyond t
+         -he regex. | Assert the seed's recommended plan by name, as the 
+         -test already does for `SEED_PLANS` (for example `RECOMMENDED = 
+         -{ co: 'Plan Estándar', cl: 'Plan Full' }`), and drop the extra 
+         -API call. | | | Open |                                         
+      31 -| REVIEW-US-02-F06 | review | nit | `frontend/src/app/features/
+         -plan-list/plan-list.html:24` | Unused template variable `let i 
+         -= $index` in the `@for`. Dead code. | Remove `; let i = $index`
+         -. | | | Open |                                                 
+      28 +| REVIEW-US-02-F03 | review | minor | `frontend/src/app/feature
+         +s/plan-list/plan-list.ts:836-839`, `pricing.ts:1003-1005`, `pla
+         +n-list.ts:827-834` | **Console-warning flood.** `price(plan)` i
+         +s a template method, so it runs on every change detection for e
+         +very card. When the vehicle year is unavailable (GAP-12), `ageF
+         +actor` logs `console.warn` on every call: 3 plans × every CD cy
+         +cle. `text()` also warns for a missing copy key on every call. 
+         +Behavior is correct (AC-17 passes), but the logs are noisy and 
+         +the repeated template work is wasted. | Compute prices once in 
+         +a `computed` (for example `pricedPlans = computed(() => plans()
+         +.map(p => ({...p, price: format(computeFinalPrice(...))})))`). 
+         +Warn once about a missing year in the component (in the `vehicl
+         +eYear` computed or an effect), not inside the pure function per
+         + call, or keep the warn in the pure function and call it once p
+         +er render set. Warn once per missing copy key (memoize). | acce
+         +pt risk: console noise only, behavior is correct | | Accepted |
+      29 +| REVIEW-US-02-F04 | review | minor | `frontend/src/app/feature
+         +s/plan-list/plan-list.ts:766-775`, `plans-guard.ts:968` | **Pla
+         +n list depends on `/form-fields`, which is fetched twice.** The
+         + guard already fetches `/form-fields` to validate step 1. The c
+         +omponent fetches it again in a `forkJoin` with `/plans` to find
+         + the `vehicleYear` key. Two effects: (1) a redundant request on
+         + every arrival; (2) if `/form-fields` fails while `/plans` succ
+         +eeds, the whole step goes to the plans error state. GAP-12 inte
+         +nds only that a missing year field falls back to factor 1.00, n
+         +ot that the plan list becomes unavailable. | Cache the fields p
+         +er country in `ApplicantFormApi` (for example `shareReplay` per
+         + code) so the guard and the component share one response. Optio
+         +nally map a `/form-fields` failure in the component to `yearKey
+         +: null` (factor 1.00 + warning) instead of failing the plans re
+         +source. | accept risk: rare failure case, the user can retry | 
+         +| Accepted |                                                   
+      30 +| REVIEW-US-02-F05 | review | minor | `frontend/e2e/us-02-plan-
+         +list.spec.ts:95-112` | **AC-02 e2e test reads its expected valu
+         +e from the system under test.** The recommended plan name comes
+         + from an unsorted Strapi query (`filters[recommended][$eq]=true
+         +`, no `sort`) and the test takes `data[0]`. It doesn't assert t
+         +he spec's concrete expectation (CO "Plan Estándar", CL "Plan Fu
+         +ll"). If the seed ever had two recommended plans, `data[0]` mig
+         +ht not be the first by `order` (GAP-09), and the test could pas
+         +s or fail for the wrong reason. The test also doesn't check tha
+         +t the badge text comes from copy for the specific card beyond t
+         +he regex. | Assert the seed's recommended plan by name, as the 
+         +test already does for `SEED_PLANS` (for example `RECOMMENDED = 
+         +{ co: 'Plan Estándar', cl: 'Plan Full' }`), and drop the extra 
+         +API call. | fix now: assert the recommended plan by name so the
+         + test does not trust the source it is testing | | Open |       
+      31 +| REVIEW-US-02-F06 | review | nit | `frontend/src/app/features/
+         +plan-list/plan-list.html:24` | Unused template variable `let i 
+         += $index` in the `@for`. Dead code. | Remove `; let i = $index`
+         +. | fix now: trivial cleanup | | Open |                        
+      32 
+      33  ## Test-writer bugs
+      34 
+
+● Bash(f=docs/reviews/REVIEW-US-02.md
+      sed -i "/^| REVIEW-US-02-F02 /s#| *| *| Open |\$#| fix now (overrides
+      proposal): accessibility is an explicit requirement and the…)
+  ⎿  Updated docs\reviews\REVIEW-US-02.md +1 -1
+      24  | ID | Source | Severity | File:line | Finding | Recommendation
+           | Human decision | Resolution commit | Status |
+      25  |----|--------|----------|-----------|---------|---------------
+          -|----------------|-------------------|--------|
+      26  | REVIEW-US-02-F01 | review | major | `frontend/src/app/feature
+          s/plan-list/plan-list.ts:845-848`, `plan-list.html:6-8`, `plans
+          -guard.ts:17-19` | **"Reintentar" does nothing when the country
+           could not be resolved.** If Strapi is down on a deep link or r
+          eload of `/{cc}/planes`, `countryMatchGuard` returns `true` on
+          `'error'`, `plansGuard` returns `true` because `country` is nul
+          l, and the template shows the technical fallback with a retry b
+          utton (`!country()` branch). `retry()` only calls `this.resourc
+          e.reload()`. The resource's `params` is `this.country() ?? unde
+          fined`, so the resource is `idle` and `reload()` is a no-op. Th
+          e country is never re-resolved, so the user is stuck until a ma
+          nual page reload. This breaks the GAP-04 / §6 error state ("Rei
+          ntentar" repeats the request). `ApplicantForm.retry()` (`applic
+          ant-form.ts:158-175`) already handles this case with `resolveAn
+          dActivate`. Related: because `plansGuard` let the navigation th
+          rough with no country, a fixed retry would show plans without t
+          he GAP-05 step 1 check ever running. | In `PlanList.retry()`, w
+          hen `country()` is null, resolve the country from the parent ro
+          ute param with `resolveAndActivate` (same as the applicant form
+          ). Then re-run navigation (`navigateByUrl(router.url, { onSameU
+          rlNavigation: 'reload' })`) so `plansGuard` checks step 1 befor
+          e plans are shown. Add a unit test for retry with no country. |
+           fix now | | Open |
+      27 -| REVIEW-US-02-F02 | review | minor | `frontend/src/app/feature
+         -s/plan-list/plan-list.html:9-11, 14-18`, `plan-list.html:14` | 
+         -**Live-region semantics differ from §7 / GAP-23.** (a) The `ari
+         -a-live="polite"` containers for loading and empty are created a
+         -t the same moment as their text. Many screen readers don't anno
+         -unce a live region that is inserted already filled, so loading 
+         -and empty may go unannounced. (b) The error message uses `role=
+         -"alert"` (assertive), but §7 says loading/empty/error are annou
+         -nced "via `aria-live=\"polite\"`". Loading and empty are P2 (AC
+         --14) and the error state is part of AC-15 (P2), so this is a be
+         -havior defect, not a missing test. | Render one persistent `<di
+         -v aria-live="polite">` outside the `@if` chain, and put the loa
+         -ding, empty and error texts inside it. Use polite rather than `
+         -role="alert"` for the error, or record the deviation in the spe
+         -c through the change loop. |  | | Open |                       
+      27 +| REVIEW-US-02-F02 | review | minor | `frontend/src/app/feature
+         +s/plan-list/plan-list.html:9-11, 14-18`, `plan-list.html:14` | 
+         +**Live-region semantics differ from §7 / GAP-23.** (a) The `ari
+         +a-live="polite"` containers for loading and empty are created a
+         +t the same moment as their text. Many screen readers don't anno
+         +unce a live region that is inserted already filled, so loading 
+         +and empty may go unannounced. (b) The error message uses `role=
+         +"alert"` (assertive), but §7 says loading/empty/error are annou
+         +nced "via `aria-live=\"polite\"`". Loading and empty are P2 (AC
+         +-14) and the error state is part of AC-15 (P2), so this is a be
+         +havior defect, not a missing test. | Render one persistent `<di
+         +v aria-live="polite">` outside the `@if` chain, and put the loa
+         +ding, empty and error texts inside it. Use polite rather than `
+         +role="alert"` for the error, or record the deviation in the spe
+         +c through the change loop. | fix now (overrides proposal): acce
+         +ssibility is an explicit requirement and the change is small; c
+         +onsistent with US-01 F04. One always-present polite live region
+         + for loading/empty/error | | Open |                            
+      28  | REVIEW-US-02-F03 | review | minor | `frontend/src/app/feature
+          s/plan-list/plan-list.ts:836-839`, `pricing.ts:1003-1005`, `pla
+          n-list.ts:827-834` | **Console-warning flood.** `price(plan)` i
+          s a template method, so it runs on every change detection for e
+          very card. When the vehicle year is unavailable (GAP-12), `ageF
+          actor` logs `console.warn` on every call: 3 plans × every CD cy
+          cle. `text()` also warns for a missing copy key on every call.
+          Behavior is correct (AC-17 passes), but the logs are noisy and
+          the repeated template work is wasted. | Compute prices once in
+          a `computed` (for example `pricedPlans = computed(() => plans()
+          .map(p => ({...p, price: format(computeFinalPrice(...))})))`).
+          Warn once about a missing year in the component (in the `vehicl
+          eYear` computed or an effect), not inside the pure function per
+           call, or keep the warn in the pure function and call it once p
+          er render set. Warn once per missing copy key (memoize). | acce
+          pt risk: console noise only, behavior is correct | | Accepted |
+      29  | REVIEW-US-02-F04 | review | minor | `frontend/src/app/feature
+          s/plan-list/plan-list.ts:766-775`, `plans-guard.ts:968` | **Pla
+          n list depends on `/form-fields`, which is fetched twice.** The
+           guard already fetches `/form-fields` to validate step 1. The c
+          omponent fetches it again in a `forkJoin` with `/plans` to find
+           the `vehicleYear` key. Two effects: (1) a redundant request on
+           every arrival; (2) if `/form-fields` fails while `/plans` succ
+          eeds, the whole step goes to the plans error state. GAP-12 inte
+          nds only that a missing year field falls back to factor 1.00, n
+          ot that the plan list becomes unavailable. | Cache the fields p
+          er country in `ApplicantFormApi` (for example `shareReplay` per
+           code) so the guard and the component share one response. Optio
+          nally map a `/form-fields` failure in the component to `yearKey
+          : null` (factor 1.00 + warning) instead of failing the plans re
+          source. | accept risk: rare failure case, the user can retry |
+          | Accepted |
+      30  | REVIEW-US-02-F05 | review | minor | `frontend/e2e/us-02-plan-
+          list.spec.ts:95-112` | **AC-02 e2e test reads its expected valu
+          e from the system under test.** The recommended plan name comes
+           from an unsorted Strapi query (`filters[recommended][$eq]=true
+          `, no `sort`) and the test takes `data[0]`. It doesn't assert t
+          he spec's concrete expectation (CO "Plan Estándar", CL "Plan Fu
+          ll"). If the seed ever had two recommended plans, `data[0]` mig
+          ht not be the first by `order` (GAP-09), and the test could pas
+          s or fail for the wrong reason. The test also doesn't check tha
+          t the badge text comes from copy for the specific card beyond t
+          he regex. | Assert the seed's recommended plan by name, as the
+          test already does for `SEED_PLANS` (for example `RECOMMENDED =
+          { co: 'Plan Estándar', cl: 'Plan Full' }`), and drop the extra
+          API call. | fix now: assert the recommended plan by name so the
+           test does not trust the source it is testing | | Open |
+
+  Searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+● implementer(Fix US-02 review findings)  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● I've recorded your HC3 decisions in the review report (commit cc4043c): F03
+  and F04 are accepted with your reasons; F01, F02, F05 and F06 are marked fix
+  now.
+
+  The implementer is now fixing F01, F02 and F06 in the app code, one commit per
+  finding. When it finishes, the test-writer will fix the F05 test, add a unit
+  test for the F01 retry, and re-run the unit and e2e suites.
+
+› Message from implementer
+  All three US-02 fixes are committed. `ng build` passes and the full unit suite
+  passes (91 tests in 9 files). I haven't run e2e, and I added no new tests.
+
+  **Commits** (SPEC-US-02 v3)
+  - F01: `87a3fd4` fix(US-02): re-resolve country and re-run guards on retry
+  (REVIEW-US-02-F01)
+  - F02 and F06 (grouped): `35325ee` fix(US-02): single persistent polite live
+  region for plan states (REVIEW-US-02-F02). The unused `let i = $index` is
+  removed in the same commit.
+
+  **Files touched** (all under
+  `/c/Proyectos/car-insurance-project/frontend/src/app/`)
+  - `features/plan-list/plan-list.ts`: `retry()` now does `resource.reload()`
+  when the country is known. When it is null, it reads the `country` param from
+  `route.parent`, calls `resolveAndActivate`, and unless the outcome is
+  `'error'` runs `router.navigateByUrl(router.url, { onSameUrlNavigation:
+  'reload' })`.
+  - `app.routes.ts`: I added `runGuardsAndResolvers: 'always'` to the `planes`
+  route. Without it, a same-URL reload does not re-run `plansGuard`, so the
+  GAP-05 step 1 check would be skipped. This goes beyond the files you named.
+  - `features/plan-list/plan-list.html`: one always-present `<div
+  aria-live="polite">` outside the `@if` chain holds the loading, empty and
+  error texts. `role="alert"` is gone. The retry and back buttons are outside
+  it. The `data-testid` values `plans-loading`, `plans-error` and `plans-empty`
+  now sit on the `<p>` inside that region.
+  - I did not touch any spec file or the review report.
+
+  **For the test-writer: unresolved-country path**
+  - Mock the Strapi country lookup so the first `CountryContext.resolve` returns
+  `'error'`. `CountryContext.current()` then stays null and the template shows
+  `plans-error` with the fallback text.
+  - Then make the lookup succeed and click "Reintentar".
+  - If step 1 is invalid, `plansGuard` redirects, so assert the final URL is
+  `/{cc}/datos`.
+  - If step 1 is valid, assert that `plan-card` elements render.
+  - If the retry fails again, the outcome is `'error'`, so there is no
+  navigation and the fallback error stays.
+  - In a unit test, `ActivatedRoute.parent.snapshot.paramMap` must supply
+  `country`. A router-based harness, or an e2e test with route mocking, is
+  simpler than stubbing it.
+
+● test-writer(US-02 fix-round tests and re-run)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● Agent "Fix US-02 review findings" finished · 1m 5s
+
+● The implementer's fixes are in: F01 in 87a3fd4, and F02 with F06 grouped in
+  35325ee. The build passes and the unit suite passes 91/91.
+
+  To fix F01, the implementer also set the plans route to re-run its guards when
+  the same URL is reloaded. Without that, a retry would show plans without
+  checking that step 1 is valid.
+
+  The test-writer is still running. It will fix the F05 test, add tests for F01
+  and F02, rebuild the Docker frontend, and run the full unit and e2e suites.
+
+› Message from test-writer
+  All three fix-round test tasks are done and every test passes: 95/95 unit and
+  19/19 e2e. No TW-BUGs. I did not check that the two new F01 tests fail against
+  the pre-fix code.
+
+  **Commits** (branch `feat/US-02-plan-list`, each ends with the Co-Authored-By
+  trailer you specified)
+  - `609d963` test(US-02): assert recommended plan by name (REVIEW-US-02-F05)
+  - `95eef94` test(US-02): retry re-resolves country and announces states in one
+  live region (REVIEW-US-02-F01, REVIEW-US-02-F02). I put F01 and F02 in one
+  commit because both live in one new spec file,
+  `frontend/src/app/features/plan-list/plan-list-fixes.spec.ts`.
+
+  **F05**
+  - In `frontend/e2e/us-02-plan-list.spec.ts`, `US-02-AC-02 highlights the
+  recommended plan (co|cl)` no longer calls Strapi.
+  - It uses a hard-coded `RECOMMENDED` map (CO "Plan Estándar", CL "Plan Full"),
+  matching SPEC-US-02 AC-02 and `cms/src/bootstrap/seed-data.ts`.
+
+  **Tests added** (all unit, in the new spec file, using a router harness with
+  the real `routes` and a mocked `StrapiClient`)
+  - `US-02-AC-15 retry re-resolves country after a failed load and renders plans
+  (REVIEW-US-02-F01)`: the country lookup fails, then succeeds, and Reintentar
+  renders the plan card.
+  - `US-02-AC-10 retry after failed country load redirects to step 1 when step 1
+  is invalid (REVIEW-US-02-F01)`: the URL ends at `/cl/datos`.
+  - `US-02-AC-14 announces states in one persistent polite live region
+  (REVIEW-US-02-F02)`:
+    - The polite region is present while loading and contains the loading text.
+    - After the plans request errors, it is the same DOM node and contains the
+  error text.
+    - There is exactly one `[aria-live]` element and no `role="alert"`.
+  - `US-02-AC-14 empty state text is announced in the same polite live region
+  (REVIEW-US-02-F02)`.
+
+  I did not add a separate test for F06 (the removed `$index` variable).
+
+  **Docker and run results**
+  - I rebuilt with `docker build -t car-insurance-project-frontend ./frontend`
+  and `docker compose up -d --no-build`.
+  - Unit: `npx ng test --watch=false` passed 95/95 across 10 files.
+  - E2E: `E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test` passed 19/19.
+
+  **TW-BUGs:** none.
+
+● Bash(f=docs/reviews/REVIEW-US-02.md
+      upd(){ sed -i "/^| REVIEW-US-02-$1 /s#| *| Open |\$#| $2 | Resolved |#"
+      "$f"; }…)
+  ⎿  Updated docs\reviews\REVIEW-US-02.md +5 -5
+      23 
+      24  | ID | Source | Severity | File:line | Finding | Recommendation
+           | Human decision | Resolution commit | Status |
+      25  |----|--------|----------|-----------|---------|---------------
+          -|----------------|-------------------|--------|
+      26 -| REVIEW-US-02-F01 | review | major | `frontend/src/app/feature
+         -s/plan-list/plan-list.ts:845-848`, `plan-list.html:6-8`, `plans
+         --guard.ts:17-19` | **"Reintentar" does nothing when the country
+         - could not be resolved.** If Strapi is down on a deep link or r
+         -eload of `/{cc}/planes`, `countryMatchGuard` returns `true` on 
+         -`'error'`, `plansGuard` returns `true` because `country` is nul
+         -l, and the template shows the technical fallback with a retry b
+         -utton (`!country()` branch). `retry()` only calls `this.resourc
+         -e.reload()`. The resource's `params` is `this.country() ?? unde
+         -fined`, so the resource is `idle` and `reload()` is a no-op. Th
+         -e country is never re-resolved, so the user is stuck until a ma
+         -nual page reload. This breaks the GAP-04 / §6 error state ("Rei
+         -ntentar" repeats the request). `ApplicantForm.retry()` (`applic
+         -ant-form.ts:158-175`) already handles this case with `resolveAn
+         -dActivate`. Related: because `plansGuard` let the navigation th
+         -rough with no country, a fixed retry would show plans without t
+         -he GAP-05 step 1 check ever running. | In `PlanList.retry()`, w
+         -hen `country()` is null, resolve the country from the parent ro
+         -ute param with `resolveAndActivate` (same as the applicant form
+         -). Then re-run navigation (`navigateByUrl(router.url, { onSameU
+         -rlNavigation: 'reload' })`) so `plansGuard` checks step 1 befor
+         -e plans are shown. Add a unit test for retry with no country. |
+         - fix now | | Open |                                            
+      27 -| REVIEW-US-02-F02 | review | minor | `frontend/src/app/feature
+         -s/plan-list/plan-list.html:9-11, 14-18`, `plan-list.html:14` | 
+         -**Live-region semantics differ from §7 / GAP-23.** (a) The `ari
+         -a-live="polite"` containers for loading and empty are created a
+         -t the same moment as their text. Many screen readers don't anno
+         -unce a live region that is inserted already filled, so loading 
+         -and empty may go unannounced. (b) The error message uses `role=
+         -"alert"` (assertive), but §7 says loading/empty/error are annou
+         -nced "via `aria-live=\"polite\"`". Loading and empty are P2 (AC
+         --14) and the error state is part of AC-15 (P2), so this is a be
+         -havior defect, not a missing test. | Render one persistent `<di
+         -v aria-live="polite">` outside the `@if` chain, and put the loa
+         -ding, empty and error texts inside it. Use polite rather than `
+         -role="alert"` for the error, or record the deviation in the spe
+         -c through the change loop. | fix now (overrides proposal): acce
+         -ssibility is an explicit requirement and the change is small; c
+         -onsistent with US-01 F04. One always-present polite live region
+         - for loading/empty/error | | Open |                            
+      26 +| REVIEW-US-02-F01 | review | major | `frontend/src/app/feature
+         +s/plan-list/plan-list.ts:845-848`, `plan-list.html:6-8`, `plans
+         +-guard.ts:17-19` | **"Reintentar" does nothing when the country
+         + could not be resolved.** If Strapi is down on a deep link or r
+         +eload of `/{cc}/planes`, `countryMatchGuard` returns `true` on 
+         +`'error'`, `plansGuard` returns `true` because `country` is nul
+         +l, and the template shows the technical fallback with a retry b
+         +utton (`!country()` branch). `retry()` only calls `this.resourc
+         +e.reload()`. The resource's `params` is `this.country() ?? unde
+         +fined`, so the resource is `idle` and `reload()` is a no-op. Th
+         +e country is never re-resolved, so the user is stuck until a ma
+         +nual page reload. This breaks the GAP-04 / §6 error state ("Rei
+         +ntentar" repeats the request). `ApplicantForm.retry()` (`applic
+         +ant-form.ts:158-175`) already handles this case with `resolveAn
+         +dActivate`. Related: because `plansGuard` let the navigation th
+         +rough with no country, a fixed retry would show plans without t
+         +he GAP-05 step 1 check ever running. | In `PlanList.retry()`, w
+         +hen `country()` is null, resolve the country from the parent ro
+         +ute param with `resolveAndActivate` (same as the applicant form
+         +). Then re-run navigation (`navigateByUrl(router.url, { onSameU
+         +rlNavigation: 'reload' })`) so `plansGuard` checks step 1 befor
+         +e plans are shown. Add a unit test for retry with no country. |
+         + fix now | 87a3fd4 (test 95eef94) | Resolved |                 
+      27 +| REVIEW-US-02-F02 | review | minor | `frontend/src/app/feature
+         +s/plan-list/plan-list.html:9-11, 14-18`, `plan-list.html:14` | 
+         +**Live-region semantics differ from §7 / GAP-23.** (a) The `ari
+         +a-live="polite"` containers for loading and empty are created a
+         +t the same moment as their text. Many screen readers don't anno
+         +unce a live region that is inserted already filled, so loading 
+         +and empty may go unannounced. (b) The error message uses `role=
+         +"alert"` (assertive), but §7 says loading/empty/error are annou
+         +nced "via `aria-live=\"polite\"`". Loading and empty are P2 (AC
+         +-14) and the error state is part of AC-15 (P2), so this is a be
+         +havior defect, not a missing test. | Render one persistent `<di
+         +v aria-live="polite">` outside the `@if` chain, and put the loa
+         +ding, empty and error texts inside it. Use polite rather than `
+         +role="alert"` for the error, or record the deviation in the spe
+         +c through the change loop. | fix now (overrides proposal): acce
+         +ssibility is an explicit requirement and the change is small; c
+         +onsistent with US-01 F04. One always-present polite live region
+         + for loading/empty/error | 35325ee (test 95eef94) | Resolved | 
+      28  | REVIEW-US-02-F03 | review | minor | `frontend/src/app/feature
+          s/plan-list/plan-list.ts:836-839`, `pricing.ts:1003-1005`, `pla
+          n-list.ts:827-834` | **Console-warning flood.** `price(plan)` i
+          s a template method, so it runs on every change detection for e
+          very card. When the vehicle year is unavailable (GAP-12), `ageF
+          actor` logs `console.warn` on every call: 3 plans × every CD cy
+          cle. `text()` also warns for a missing copy key on every call.
+          Behavior is correct (AC-17 passes), but the logs are noisy and
+          the repeated template work is wasted. | Compute prices once in
+          a `computed` (for example `pricedPlans = computed(() => plans()
+          .map(p => ({...p, price: format(computeFinalPrice(...))})))`).
+          Warn once about a missing year in the component (in the `vehicl
+          eYear` computed or an effect), not inside the pure function per
+           call, or keep the warn in the pure function and call it once p
+          er render set. Warn once per missing copy key (memoize). | acce
+          pt risk: console noise only, behavior is correct | | Accepted |
+      29  | REVIEW-US-02-F04 | review | minor | `frontend/src/app/feature
+          s/plan-list/plan-list.ts:766-775`, `plans-guard.ts:968` | **Pla
+          n list depends on `/form-fields`, which is fetched twice.** The
+           guard already fetches `/form-fields` to validate step 1. The c
+          omponent fetches it again in a `forkJoin` with `/plans` to find
+           the `vehicleYear` key. Two effects: (1) a redundant request on
+           every arrival; (2) if `/form-fields` fails while `/plans` succ
+          eeds, the whole step goes to the plans error state. GAP-12 inte
+          nds only that a missing year field falls back to factor 1.00, n
+          ot that the plan list becomes unavailable. | Cache the fields p
+          er country in `ApplicantFormApi` (for example `shareReplay` per
+           code) so the guard and the component share one response. Optio
+          nally map a `/form-fields` failure in the component to `yearKey
+          : null` (factor 1.00 + warning) instead of failing the plans re
+          source. | accept risk: rare failure case, the user can retry |
+          | Accepted |
+      30 -| REVIEW-US-02-F05 | review | minor | `frontend/e2e/us-02-plan-
+         -list.spec.ts:95-112` | **AC-02 e2e test reads its expected valu
+         -e from the system under test.** The recommended plan name comes
+         - from an unsorted Strapi query (`filters[recommended][$eq]=true
+         -`, no `sort`) and the test takes `data[0]`. It doesn't assert t
+         -he spec's concrete expectation (CO "Plan Estándar", CL "Plan Fu
+         -ll"). If the seed ever had two recommended plans, `data[0]` mig
+         -ht not be the first by `order` (GAP-09), and the test could pas
+         -s or fail for the wrong reason. The test also doesn't check tha
+         -t the badge text comes from copy for the specific card beyond t
+         -he regex. | Assert the seed's recommended plan by name, as the 
+         -test already does for `SEED_PLANS` (for example `RECOMMENDED = 
+         -{ co: 'Plan Estándar', cl: 'Plan Full' }`), and drop the extra 
+         -API call. | fix now: assert the recommended plan by name so the
+         - test does not trust the source it is testing | | Open |       
+      31 -| REVIEW-US-02-F06 | review | nit | `frontend/src/app/features/
+         -plan-list/plan-list.html:24` | Unused template variable `let i 
+         -= $index` in the `@for`. Dead code. | Remove `; let i = $index`
+         -. | fix now: trivial cleanup | | Open |                        
+      30 +| REVIEW-US-02-F05 | review | minor | `frontend/e2e/us-02-plan-
+         +list.spec.ts:95-112` | **AC-02 e2e test reads its expected valu
+         +e from the system under test.** The recommended plan name comes
+         + from an unsorted Strapi query (`filters[recommended][$eq]=true
+         +`, no `sort`) and the test takes `data[0]`. It doesn't assert t
+         +he spec's concrete expectation (CO "Plan Estándar", CL "Plan Fu
+         +ll"). If the seed ever had two recommended plans, `data[0]` mig
+         +ht not be the first by `order` (GAP-09), and the test could pas
+         +s or fail for the wrong reason. The test also doesn't check tha
+         +t the badge text comes from copy for the specific card beyond t
+         +he regex. | Assert the seed's recommended plan by name, as the 
+         +test already does for `SEED_PLANS` (for example `RECOMMENDED = 
+         +{ co: 'Plan Estándar', cl: 'Plan Full' }`), and drop the extra 
+         +API call. | fix now: assert the recommended plan by name so the
+         + test does not trust the source it is testing | 609d963 | Resol
+         +ved |                                                          
+      31 +| REVIEW-US-02-F06 | review | nit | `frontend/src/app/features/
+         +plan-list/plan-list.html:24` | Unused template variable `let i 
+         += $index` in the `@for`. Dead code. | Remove `; let i = $index`
+         +. | fix now: trivial cleanup | 35325ee | Resolved |            
+      32 
+      33  ## Test-writer bugs
+      34 
+     ...
+      73    - **Fictitious data:** e2e step 1 values use `example.test` e
+          mails and placeholder documents and plates.
+      74    - **Code quality:** no `any`.
+      75    - **Process:** the branch `feat/US-02-plan-list` matches an A
+          pproved spec (v3), no scaffold-branch feature code, commit subj
+          ects follow Conventional Commits with the `US-02` scope. `Refs:
+          ` trailers can't be verified from the `--oneline` commit list i
+          n the review input.
+      76 -- Re-review after fixes: pending.                              
+      76 +- Re-review after fixes: not run (one review round only, per st
+         +ory-cycle instructions). Fix round verified by test-writer: uni
+         +t 95/95, e2e 19/19, no TW-BUGs.                                
+
+● Agent "US-02 fix-round tests and re-run" finished · 1m 51s
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● HC4: US-02 ready for your check
+
+  - Findings: F01, F02, F05 and F06 are fixed, and F03 and F04 are accepted. The
+    resolution commits are recorded in docs/reviews/REVIEW-US-02.md (11ec055).
+  - Tests: 95/95 unit and 19/19 e2e pass, with no bugs reported by the
+    test-writer.
+  - Stack: the test-writer rebuilt the frontend image after the fixes. The stack
+    is up at http://127.0.0.1:4200; localhost:4200 reaches a stray dev server,
+    so use the 127.0.0.1 address.
+
+  Manual checklist. Fill step 1 first, with any fictitious data.
+  1. CO, AC-01: fill step 1 on /co/datos with vehicle year 2023. The plans are
+     exactly Plan Básico, Plan Estándar and Plan Premium, in that order, with no
+     "Plan Antiguo" and no "Plan Borrador".
+  2. CO, AC-02: only Plan Estándar shows the "Recomendado" badge.
+  3. CL, AC-01/02: on /cl/... the plans are Plan Esencial, Plan Full and Plan
+     Full Plus, and only Plan Full is marked "Recomendado".
+  4. AC-09/03: "Continuar" is disabled until you pick a plan. Using only the
+     keyboard (Tab, then the arrow keys and Space), select Plan Premium, then
+     press Continuar. You land on /co/resumen.
+  5. AC-05: go back to step 1 and change the vehicle year to 2014. Every price
+     goes up by 30% compared with item 1. A year from 2016 to 2020 gives +15%,
+     and 2021 or later gives the base price.
+  6. AC-10: in a new private window, open /cl/planes directly. You are sent to
+     /cl/datos.
+  7. AC-12: select a plan, then unpublish that plan in the Strapi admin
+     (127.0.0.1:1337/admin) and reload. The selection is cleared and Continuar
+     is disabled. This item is optional; a unit test covers it.
+  8. F01 retry: stop the CMS (docker compose stop cms) and reload /co/planes.
+     You get the error message with "Reintentar". Start the CMS again (docker
+     compose start cms), press Reintentar, and the plans load. Use /co/planes
+     after completing step 1, otherwise you are sent to /co/datos.
+
+  The empty state (AC-04) and the 403 on a public write (AC-19) are covered only
+  by automated tests.
+
+  Not checked yet: the P2 criteria 06, 07, 08, 11, 13, 14, 15, 20 and 21 are
+  implemented but have no automated tests. On approval I'll list them in the
+  README as "manual check / pending", add the two accepted risks (F03, F04) to
+  its known-risks table, then merge, push, and remind you to run /export.
+
+  Reply APPROVED or REJECTED: <reason>.
+
+> <ide_selection>The user selected the lines 2 to 3 from
+  c:\Proyectos\car-insurance-project\.claude\agents\reviewer.md:
+
+  description: Reviews a story's changes against its spec
+
+  This may or may not be related to the current task.</ide_selection>
+
+> APPROVED (ready for QA). I verified checklist items 1-6 and 8 manually in
+  both countries, plus a live Strapi change: I moved the "recommended" flag to
+  another plan, published it, and the app reflected it after reload (then
+  restored it).
+
+  List the P2 criteria and accepted risks in the README as you proposed, merge
+  into main and push.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Update(README.md)
+  ⎿  Added 2 lines
+      77  |------|--------|--------|--------------|
+      78  | Anonymous `GET /api/<type>?status=draft` returns **draft** en
+          tries (verified on Strapi 5.63): any Public `find` permission h
+          onors the `status` parameter. The app never sends it, so drafts
+           never reach the UI, but a direct caller can read unpublished c
+          ontent. | Low: unpublished business content (fields, plans), no
+           personal data. | Accepted for now (Andres Beltran, 2026-11-23,
+           Phase 2 checkpoint). Fixed if time remains. | A global Strapi
+          middleware that forces `status=published` on unauthenticated `/
+          api` requests, plus a test in `cms/tests/` proving `?status=dra
+          ft` returns no drafts. |
+      79  | Missing Strapi copy for `form.title`, `form.intro`, `form.emp
+          ty` or `common.continue` renders empty text, and the missing-ke
+          y warning is logged on every change-detection pass (REVIEW-US-0
+          1-F09). | Low: the seed defines all keys; affects only misconfi
+          gured content. | Accepted (Andres Beltran, 2026-11-23, HC3 US-0
+          1). | Technical fallbacks for those keys; warn once per key. |
+      80 +| Plan prices are recomputed in the template on every change-de
+         +tection pass; when the vehicle year is unavailable, the factor-
+         +1 warning (and any missing-copy warning) is logged repeatedly (
+         +REVIEW-US-02-F03). | Low: console noise only; prices are correc
+         +t. | Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Comput
+         +e priced plans once in a `computed`; warn once. |              
+      81 +| The plans step fetches `/form-fields` twice (guard + componen
+         +t), and if only `/form-fields` fails the whole plan list shows 
+         +the error state instead of falling back to factor 1.00 (REVIEW-
+         +US-02-F04). | Low: rare failure case; "Reintentar" recovers. | 
+         +Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Cache form 
+         +fields per country and map a fields failure to "no vehicle year
+         +". |                                                           
+      82 
+      83  ## Manual checks (P2 without automated test)
+      84 
+
+● Update(README.md)
+  ⎿  Added 9 lines
+      85  | AC | How verified |
+      86  |----|--------------|
+      87  | US-01-AC-21 (small screens, 320 px) | Manually at HC4 in CO a
+          nd CL (Andres Beltran, 2026-11-23). |
+      88 +| US-02-AC-08 (single selection with keyboard) | Manually at HC
+         +4 (keyboard-only selection and continue), Andres Beltran, 2026-
+         +11-23. |                                                       
+      89 +| US-02-AC-13 (price recalculated after editing step 1) | Manua
+         +lly at HC4 (vehicle year changed, prices updated), Andres Beltr
+         +an, 2026-11-23. |                                              
+      90 +| US-02-AC-15 (error state with retry) | Manually at HC4 (CMS s
+         +topped, error shown, retry after restart loads plans), Andres B
+         +eltran, 2026-11-23. Unresolved-country retry also unit-tested (
+         +REVIEW-US-02-F01). |                                           
+      91 +| US-02-AC-14 (loading state) | Pending manual check. Live-regi
+         +on behavior unit-tested (REVIEW-US-02-F02). |                  
+      92 +| US-02-AC-06 (price in country currency and format) | Pending 
+         +manual check. |                                                
+      93 +| US-02-AC-07 (only the first recommended plan is highlighted) 
+         +| Pending manual check. At HC4 the recommended flag was moved t
+         +o another plan in Strapi and the app reflected it after reload.
+         + |                                                             
+      94 +| US-02-AC-11 (selection kept on return and reload) | Pending m
+         +anual check. |                                                 
+      95 +| US-02-AC-20 (focus on arrival) | Pending manual check. |     
+      96 +| US-02-AC-21 (responsive layout) | Pending manual check. |    
+      97 
+      98  ## Requirements not met
+      99 
+
+● Bash(git add README.md && git commit -q -F - <<'EOF'
+      docs(US-02): record HC4 sign-off, accepted risks and manual checks…)
+  ⎿  Updated README.md -11
+  ⎿  Deleted docs\reviews\REVIEW-US-02.md -76
+  ⎿  Deleted frontend\e2e\us-02-plan-list.spec.ts -169
+  ⎿  Updated frontend\src\app\app.routes.ts +34 -41
+  ⎿  Deleted frontend\src\app\features\plan-list\plan-list-api.ts -23
+  ⎿  … +9 files changed
+     docs\reviews\US-02.diff
+     frontend\src\app\features\plan-list\plan-list-fixes.spec.ts
+     frontend\src\app\features\plan-list\plan-list.css
+     +6 more
+  ⎿  (a git step in this command can move the working tree, so these may be
+     its changes, not edits) (ctrl+o to expand)
+
+● The merge didn't accept a message from stdin (main is unchanged). Retrying
+  with a message file.
+
+● Bash(M="C:/Users/abelt/AppData/Local/Temp/claude/f559641e098c878a/e25fc32d-74c
+      9-401b-888e-6c133b7a9d59/scratchpad/merge-msg.txt"
+      printf 'merge(US-02): Plan list — re…)
+  ⎿  Updated README.md +11
+  ⎿  Created docs\reviews\REVIEW-US-02.md +76
+  ⎿  Created frontend\e2e\us-02-plan-list.spec.ts +169
+  ⎿  Updated frontend\src\app\app.routes.ts +8 -1
+  ⎿  Created frontend\src\app\features\plan-list\plan-list-api.ts +23
+  ⎿  … +9 files changed
+     docs\reviews\US-02.diff
+     frontend\src\app\features\plan-list\plan-list-fixes.spec.ts
+     frontend\src\app\features\plan-list\plan-list.css
+     +6 more
+  ⎿  (a git step in this command can move the working tree, so these may be
+     its changes, not edits) (ctrl+o to expand)
+
+● US-02 is merged into main as ec0e59a merge(US-02): Plan list — ready for QA
+  and pushed. feat/US-02-plan-list is also on the remote.
+
+  I updated the README in 2c27df2:
+  - Known risks: F03 and F04 are listed as accepted at HC3, with their reasons.
+  - Manual checks:
+    - AC-08, AC-13 and AC-15 are marked as verified by you at HC4.
+    - AC-06, AC-07, AC-11, AC-14, AC-20 and AC-21 are listed as "Pending manual
+      check". I couldn't tie your checklist pass to those, so they're marked
+      pending.
+    - The AC-07 row notes your test of moving the recommended flag in Strapi.
+
+  Next step for you: run /export and save it as
+  docs/ai-sessions/2026-11-23-US-02.txt.
+
+  Two other files are still untracked on main:
+  docs/ai-sessions/2026-11-23-US-01.txt and docs/ai-sessions/raw/c56ac316-…/.
+  They have not had the email and secret scan yet. I can scan and commit them
+  with the US-02 export if you want.
