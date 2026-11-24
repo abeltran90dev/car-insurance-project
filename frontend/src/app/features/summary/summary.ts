@@ -208,8 +208,14 @@ export class Summary {
       planName: view.plan.name,
       formattedPrice: view.formattedPrice,
     });
-    await this.router.navigate(['/', country.code.toLowerCase(), 'confirmacion']);
+    const code = country.code.toLowerCase();
+    // ADR-004: clear the quote before navigating; state `approved` keeps the "plan unavailable" view hidden.
     this.store.clear();
+    const navigated = await this.router.navigate(['/', code, 'confirmacion']);
+    if (!navigated) {
+      this.confirmations.clear();
+      await this.router.navigate(['/', code, 'datos']);
+    }
   }
 
   protected editData(): void {

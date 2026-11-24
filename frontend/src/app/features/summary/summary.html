@@ -74,10 +74,10 @@
         </div>
 
         @if (termsAvailable()) {
-          <section class="terms" aria-labelledby="terms-title" data-testid="terms">
+          <div class="terms" data-testid="terms">
             <h2 id="terms-title">{{ country()!.termsTitle }}</h2>
             <div class="terms__body" role="region" aria-labelledby="terms-title" tabindex="0" data-testid="terms-body">{{ country()!.termsBody }}</div>
-          </section>
+          </div>
         } @else {
           <p data-testid="terms-unavailable" role="alert">{{ text('summary.termsUnavailable', '') }}</p>
         }
