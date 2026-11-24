@@ -14,6 +14,16 @@ Requirements: Docker with Docker Compose v2+. Nothing else is needed for the run
 docker compose up --build
 ```
 
+**Windows note.** On Docker Compose v5 for Windows the command fails with `failed to execute bake: exit status 1` when the shell's working directory has a **lowercase drive letter** (`c:\...`, the default in VS Code terminals). Buildx bake's filesystem-entitlement check compares paths case-sensitively. `COMPOSE_BAKE=false` does not help (Compose v5 always builds through bake), and nothing in `docker-compose.yml` can change it. Either:
+
+```powershell
+cd C:\path\to\car-insurance-project      # uppercase drive letter, then the plain command works
+# or
+$env:BUILDX_BAKE_ENTITLEMENTS_FS=0; docker compose up --build    # Git Bash: BUILDX_BAKE_ENTITLEMENTS_FS=0 docker compose up --build
+```
+
+Verified on 2026-11-23 (Docker 29.9.1, Compose v5.6.0): from `c:\` the build fails, with either workaround it succeeds; a fresh `git clone` with empty volumes comes up with `cms` healthy, the app on :4200 and the admin on :1337.
+
 | URL | What |
 |-----|------|
 | http://localhost:4200 | Angular app (country picker at `/`, then `/co` or `/cl`) |
@@ -35,7 +45,7 @@ cd frontend && npm ci && npm start # ng serve on :4200, proxies /api to :1337 (p
 
 ### Troubleshooting
 
-- **`failed to execute bake` on Windows** (Docker Compose v5.x): a Buildx bake filesystem-entitlement check fails on drive-letter case. Run `export BUILDX_BAKE_ENTITLEMENTS_FS=0` (Git Bash) or `$env:BUILDX_BAKE_ENTITLEMENTS_FS=0` (PowerShell) before `docker compose up --build`.
+- **`failed to execute bake` on Windows:** see the Windows note under "How to run".
 - **Port in use:** stop whatever is on 4200 or 1337, or change the host port in `docker-compose.yml`.
 - **curl and Strapi filters:** use `curl -g` so `[` `]` in query strings are not treated as globs.
 
