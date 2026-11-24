@@ -1,0 +1,98 @@
+<section class="page plan-list">
+  @if (country()) {
+    <h1 #heading tabindex="-1">{{ text('plans.title', '') }}</h1>
+  }
+
+  @if (!country()) {
+    <p role="alert" data-testid="plans-error">{{ fallback.error }}</p>
+    <button type="button" class="button" (click)="retry()">{{ fallback.retry }}</button>
+  } @else if (resource.isLoading()) {
+    <div aria-live="polite" data-testid="plans-loading">
+      <p>{{ text('plans.loading', fallback.loading) }}</p>
+    </div>
+  } @else if (resource.error()) {
+    <p role="alert" data-testid="plans-error">{{ text('plans.error', fallback.error) }}</p>
+    <button type="button" class="button" (click)="retry()">{{ text('common.retry', fallback.retry) }}</button>
+  } @else if (plans().length === 0) {
+    <p aria-live="polite" data-testid="plans-empty">{{ text('plans.empty', '') }}</p>
+    <div class="actions">
+      <button type="button" class="button button--secondary" (click)="back()">{{ text('common.back', '') }}</button>
+    </div>
+  } @else {
+    <fieldset class="plans">
+      <legend class="visually-hidden">{{ text('plans.title', '') }}</legend>
+      @for (plan of plans(); track plan.documentId; let i = $index) {
+        @let selected = selectedId() === plan.documentId;
+        @let highlighted = recommendedId() === plan.documentId;
+        <div
+          class="plan"
+          [class.plan--recommended]="highlighted"
+          [class.plan--selected]="selected"
+          [attr.data-testid]="'plan-card'"
+        >
+          <label class="plan__choice" [for]="'plan-' + plan.documentId">
+            <input
+              type="radio"
+              name="plan"
+              [id]="'plan-' + plan.documentId"
+              [value]="plan.documentId"
+              [checked]="selected"
+              [attr.aria-describedby]="'plan-' + plan.documentId + '-price' + (highlighted ? ' plan-' + plan.documentId + '-badge' : '')"
+              (change)="select(plan)"
+            />
+            <span class="plan__name">{{ plan.name }}</span>
+            @if (selected) {
+              <span class="plan__check" aria-hidden="true">&#10003;</span>
+            }
+          </label>
+          @if (highlighted) {
+            <p class="plan__badge" [id]="'plan-' + plan.documentId + '-badge'" data-testid="plan-badge">
+              {{ text('plans.recommendedBadge', '') }}
+            </p>
+          }
+          @if (plan.shortDescription) {
+            <p class="plan__description">{{ plan.shortDescription }}</p>
+          }
+          <p class="plan__price" [id]="'plan-' + plan.documentId + '-price'">
+            <span class="plan__price-label">{{ text('plans.priceLabel', '') }}</span>
+            <strong data-testid="plan-price">{{ price(plan) }}</strong>
+            <span>{{ text('plans.pricePeriod', '') }}</span>
+          </p>
+          <p class="plan__note">{{ text('plans.priceNote', '') }}</p>
+          @if (plan.coverages.length > 0) {
+            <h2 class="plan__heading">{{ text('plans.coveragesHeading', '') }}</h2>
+            <ul class="plan__list">
+              @for (item of plan.coverages; track $index) {
+                <li>
+                  {{ item.title }}
+                  @if (item.description) {
+                    <span class="plan__item-desc">{{ item.description }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          }
+          @if (plan.benefits.length > 0) {
+            <h2 class="plan__heading">{{ text('plans.benefitsHeading', '') }}</h2>
+            <ul class="plan__list">
+              @for (item of plan.benefits; track $index) {
+                <li>
+                  {{ item.title }}
+                  @if (item.description) {
+                    <span class="plan__item-desc">{{ item.description }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      }
+    </fieldset>
+    <div class="actions">
+      <button type="button" class="button button--secondary" (click)="back()">{{ text('common.back', '') }}</button>
+      <button type="button" class="button" [disabled]="!canContinue()" (click)="next()">
+        {{ text('common.continue', '') }}
+      </button>
+    </div>
+  }
+</section>
