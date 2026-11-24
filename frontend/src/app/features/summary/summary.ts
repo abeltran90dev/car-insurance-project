@@ -150,8 +150,14 @@ export class Summary {
   }
 
   protected setAccepted(event: Event): void {
-    if (!this.locked()) {
-      this.accepted.set((event.target as HTMLInputElement).checked);
+    if (this.locked()) {
+      return;
+    }
+    const checked = (event.target as HTMLInputElement).checked;
+    this.accepted.set(checked);
+    if (!checked && this.state() === 'gateway') {
+      this.state.set('idle');
+      this.focusLater(this.payButton);
     }
   }
 
@@ -173,7 +179,7 @@ export class Summary {
 
   /** SPEC-US-03 section 5 "Single submit": only accepted from `gateway`. */
   protected simulate(outcome: 'approved' | 'rejected'): void {
-    if (this.state() !== 'gateway') {
+    if (this.state() !== 'gateway' || !this.accepted() || !this.termsAvailable()) {
       return;
     }
     this.state.set('processing');
