@@ -126,7 +126,7 @@ There is no payment gateway and no card data. After the user accepts the country
 | [docs/specs/](docs/specs/) | One approved, versioned spec per story |
 | [docs/adr/](docs/adr/) | Architecture decision records (MADR), ADR-001..005 |
 | [docs/reviews/](docs/reviews/) | Review inputs (`US-NN.diff`), review reports with human decisions, the delivery audit |
-| [docs/prompts/](docs/prompts/) | Phase prompts written by the human |
+| [docs/prompts/](docs/prompts/) | Phase prompts (drafted with the Claude.ai planning chat, final decisions by the human) |
 | [docs/ai-sessions/](docs/ai-sessions/) | Unedited session exports (see its README for the raw-transcript exclusion) |
 | [.claude/agents/](.claude/agents/) | Subagent definitions (spec-writer, architect, implementer, test-writer, reviewer) |
 | [.claude/skills/](.claude/skills/) | Custom skills (spec-authoring, strapi5-content-modeling, angular-conventions) |
@@ -182,4 +182,4 @@ Source: [delivery audit](docs/reviews/AUDIT-DELIVERY.md) and the review reports.
 
 ## How AI was used
 
-The whole increment was produced by an agentic flow in **Claude Code** (main session and subagents on Claude Opus 5.5 / Claude Sonnet 5.5). Five subagents (spec-writer, architect, implementer, test-writer, reviewer) did the work. Three project skills and a spec-gate hook supported them, and four human checkpoints controlled them. One spec (SPEC-US-01) was drafted with AI in a Claude.ai planning chat after a safety-classifier block. All approvals, scope decisions and manual verification were done by the human. Details, evidence and lessons learned: [FLOW.md](FLOW.md). Unedited logs: [docs/ai-sessions/](docs/ai-sessions/). No paid tool was replaced by a free alternative.
+The whole increment was produced by an agentic flow in **Claude Code** (main session and subagents on Claude Opus 5.5 / Claude Sonnet 5.5). Five subagents (spec-writer, architect, implementer, test-writer, reviewer) did the work. Three project skills and a spec-gate hook supported them, and four human checkpoints controlled them. A separate Claude.ai planning chat (Claude Opus 5.5) was used as an advisor. It drafted the phase prompts (versioned in `docs/prompts/`) and the first draft of SPEC-US-01, and proposed options at checkpoints. Its log is not included by the author's decision; it is available on request. All Claude Code sessions are included unedited in [docs/ai-sessions/](docs/ai-sessions/). All approvals, scope decisions and manual verification were done by the human. Details, evidence and lessons learned are in [FLOW.md](FLOW.md). No paid tool was replaced by a free alternative.
