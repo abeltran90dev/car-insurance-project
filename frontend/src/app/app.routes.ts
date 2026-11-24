@@ -23,6 +23,7 @@ export const routes: Routes = [
       {
         path: 'planes',
         canActivate: [plansGuard],
+        runGuardsAndResolvers: 'always',
         loadComponent: () => import('./features/plan-list/plan-list').then((m) => m.PlanList),
       },
       ...STEPS.filter((step) => step !== 'datos' && step !== 'planes').map((step) => ({

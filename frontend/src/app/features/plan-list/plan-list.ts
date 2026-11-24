@@ -11,9 +11,10 @@ import {
   viewChild,
 } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, map } from 'rxjs';
 import { CLOCK } from '../../core/clock';
+import { resolveAndActivate } from '../../core/country-activation';
 import { CountryContext } from '../../core/country-context';
 import { QuoteStore } from '../../core/quote-store';
 import { FALLBACK_COPY } from '../../core/site-copy';
@@ -35,6 +36,7 @@ export class PlanList {
   private readonly context = inject(CountryContext);
   private readonly store = inject(QuoteStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly clock = inject(CLOCK);
   private readonly injector = inject(Injector);
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
@@ -125,7 +127,22 @@ export class PlanList {
 
   protected retry(): void {
     this.headingFocused = false;
-    this.resource.reload();
+    if (this.country()) {
+      this.resource.reload();
+      return;
+    }
+    const code = this.route.parent?.snapshot.paramMap.get('country')?.toUpperCase();
+    if (code) {
+      void this.resolveAfterError(code);
+    }
+  }
+
+  private async resolveAfterError(code: string): Promise<void> {
+    const outcome = await resolveAndActivate(this.context, this.store, code);
+    if (outcome !== 'error') {
+      // Re-run the guards (canMatch, plansGuard) now that the country is known (GAP-05).
+      await this.router.navigateByUrl(this.router.url, { onSameUrlNavigation: 'reload' });
+    }
   }
 
   protected back(): void {
