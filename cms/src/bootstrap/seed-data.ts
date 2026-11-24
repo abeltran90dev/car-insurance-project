@@ -254,16 +254,10 @@ const buildPlans = (s: PlanSet): SeedPlan[] => {
 };
 
 const TERMS_CO =
-  "1. Este es un texto de ejemplo para Colombia.
-2. Supervisión: Superintendencia Financiera de Colombia (texto de ejemplo).
-3. La cotización es simulada y no constituye una póliza.
-4. No se realiza ningún cobro real.";
+  '1. Este es un texto de ejemplo para Colombia.\n2. Supervisión: Superintendencia Financiera de Colombia (texto de ejemplo).\n3. La cotización es simulada y no constituye una póliza.\n4. No se realiza ningún cobro real.';
 
 const TERMS_CL =
-  "1. Este es un texto de ejemplo para Chile.
-2. Supervisión: Comisión para el Mercado Financiero (texto de ejemplo).
-3. La cotización es simulada y no constituye una póliza.
-4. No se realiza ningún cobro real.";
+  '1. Este es un texto de ejemplo para Chile.\n2. Supervisión: Comisión para el Mercado Financiero (texto de ejemplo).\n3. La cotización es simulada y no constituye una póliza.\n4. No se realiza ningún cobro real.';
 
 export const COUNTRIES: SeedCountry[] = [
   {
