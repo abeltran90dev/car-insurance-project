@@ -1,0 +1,1460 @@
+# US-03 review input  base=ec0e59a8c2eb8b27c8da1ba88cbb672a01c79e00 head=f6724806ac328c343f3091821e88f0a7f209c8e8
+## Commits
+f672480 test(US-03): e2e summary/payment per country and keyboard-only full flow
+4b05ba2 test(US-03): unit tests for mask, quote number, double submit, terms and guard
+1010f80 feat(US-03): summary and confirmation steps with simulated payment
+a6f74b1 feat(US-03): add summary helpers (mask, quote number, row model)
+## Changed files
+A	frontend/e2e/full-flow-keyboard.spec.ts
+A	frontend/e2e/us-03-summary-payment.spec.ts
+M	frontend/src/app/app.routes.ts
+A	frontend/src/app/features/confirmation/confirmation-guard.ts
+A	frontend/src/app/features/confirmation/confirmation.ts
+A	frontend/src/app/features/summary/confirmation-store.ts
+A	frontend/src/app/features/summary/mask.ts
+A	frontend/src/app/features/summary/payment-settings.ts
+A	frontend/src/app/features/summary/quote-number.ts
+A	frontend/src/app/features/summary/summary-guard.spec.ts
+A	frontend/src/app/features/summary/summary-guard.ts
+A	frontend/src/app/features/summary/summary-model.ts
+A	frontend/src/app/features/summary/summary.css
+A	frontend/src/app/features/summary/summary.html
+A	frontend/src/app/features/summary/summary.spec.ts
+A	frontend/src/app/features/summary/summary.ts
+## Diff
+diff --git a/frontend/e2e/full-flow-keyboard.spec.ts b/frontend/e2e/full-flow-keyboard.spec.ts
+new file mode 100644
+index 0000000..3122bc4
+--- /dev/null
++++ b/frontend/e2e/full-flow-keyboard.spec.ts
+@@ -0,0 +1,104 @@
++import { expect, Page, test } from '@playwright/test';
++
++/** Keyboard-only helpers: no mouse, no click(), no fill(). */
++const activeInfo = (page: Page) =>
++  page.evaluate(() => {
++    const el = document.activeElement as HTMLElement | null;
++    return {
++      id: el?.id ?? '',
++      tag: el?.tagName ?? '',
++      type: (el as HTMLInputElement | null)?.type ?? '',
++      testid: el?.getAttribute('data-testid') ?? '',
++      text: (el?.textContent ?? '').trim(),
++      checked: (el as HTMLInputElement | null)?.checked ?? false,
++    };
++  });
++
++/** Presses Tab until the predicate matches the focused element (fails if unreachable). */
++async function tabTo(page: Page, label: string, match: (a: Awaited<ReturnType<typeof activeInfo>>) => boolean) {
++  for (let i = 0; i < 40; i++) {
++    if (match(await activeInfo(page))) return;
++    await page.keyboard.press('Tab');
++  }
++  throw new Error(`${label} not reachable with Tab`);
++}
++
++const button = (text: string) => (a: Awaited<ReturnType<typeof activeInfo>>) => a.tag === 'BUTTON' && a.text === text;
++
++// BUG: TW-BUG-01 (summary guard breaks step 2 -> step 3)
++test('US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only', async ({ page }) => {
++  const year = String(new Date().getFullYear() - 2);
++
++  // Step 1 (same keyboard sequence as the US-01 test).
++  await page.goto('/co/datos');
++  await expect(page.locator('div.field[data-field="documentNumber"]')).toBeVisible();
++  const focusField = (key: string) => tabTo(page, `field-${key}`, (a) => a.id === `field-${key}`);
++
++  await focusField('documentType');
++  await page.keyboard.press('ArrowDown');
++  await focusField('documentNumber');
++  await page.keyboard.type('1111111111');
++  await page.keyboard.press('Tab');
++  await page.keyboard.type('Ana');
++  await page.keyboard.press('Tab');
++  await page.keyboard.type('Prueba');
++  await page.keyboard.press('Tab');
++  await page.keyboard.type('01151990'); // mm/dd/yyyy segments (Chromium en-US)
++  await focusField('email');
++  await page.keyboard.type('ana.prueba@example.test');
++  await page.keyboard.press('Tab');
++  await page.keyboard.type('3001234567');
++  await focusField('city');
++  await page.keyboard.press('ArrowDown');
++  await focusField('acceptDataPolicy');
++  await page.keyboard.press('Space');
++  await focusField('plate');
++  await page.keyboard.type('ABC123');
++  await focusField('brand');
++  await page.keyboard.press('ArrowDown');
++  await focusField('model');
++  await page.keyboard.type('Modelo Uno');
++  await page.keyboard.press('Tab');
++  await page.keyboard.type(year);
++  await page.keyboard.press('Tab');
++  await page.keyboard.type('12000');
++  await page.keyboard.press('Tab');
++  await expect(page.locator('button[type=submit]')).toBeFocused();
++  await page.keyboard.press('Enter');
++
++  // Step 2: plans. Tab into the radio group, ArrowDown to the 2nd plan, then Continue.
++  await expect(page).toHaveURL(/\/co\/planes$/);
++  await expect(page.getByRole('radio').first()).toBeVisible();
++  await tabTo(page, 'plan radio', (a) => a.tag === 'INPUT' && a.type === 'radio');
++  await page.keyboard.press('ArrowDown');
++  const chosen = await page.getByRole('radio', { checked: true }).evaluate((el) => (el as HTMLInputElement).id);
++  expect(chosen).not.toBe('');
++  const chosenName = await page.locator(`label[for="${chosen}"], label:has(#${chosen})`).first().innerText().catch(() => '');
++  await tabTo(page, 'Continuar', (a) => a.tag === 'BUTTON' && !(a as { text: string }).text.includes('Volver') && a.text.length > 0 && a.id === '' && a.text !== 'Volver');
++  await expect(page.getByRole('button', { name: 'Continuar' })).toBeFocused();
++  await page.keyboard.press('Enter');
++
++  // Step 3: summary. Focus starts on the h1.
++  await expect(page).toHaveURL(/\/co\/resumen$/);
++  await expect(page.getByTestId('summary-plan-name')).toBeVisible();
++  await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
++  void chosenName;
++
++  await tabTo(page, 'terms checkbox', (a) => a.id === 'terms-accept');
++  await page.keyboard.press('Space');
++  await expect(page.getByRole('checkbox', { name: 'Acepto los términos y condiciones' })).toBeChecked();
++
++  await tabTo(page, 'Pagar', button('Pagar'));
++  await page.keyboard.press('Enter');
++  await expect(page.getByTestId('gateway')).toBeVisible();
++  await expect(page.locator('#gateway-title')).toBeFocused(); // focus moves to gateway heading
++
++  await tabTo(page, 'Simular pago aprobado', button('Simular pago aprobado'));
++  await page.keyboard.press('Enter');
++  await expect(page.getByTestId('payment-processing')).toBeVisible();
++
++  // Confirmation: h1 focused, quote number shown.
++  await expect(page).toHaveURL(/\/co\/confirmacion$/);
++  await expect(page.getByTestId('quote-number')).toHaveText(/^COT-CO-\d{8}-[A-Z0-9]{6}$/);
++  await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
++});
+diff --git a/frontend/e2e/us-03-summary-payment.spec.ts b/frontend/e2e/us-03-summary-payment.spec.ts
+new file mode 100644
+index 0000000..45ec26c
+--- /dev/null
++++ b/frontend/e2e/us-03-summary-payment.spec.ts
+@@ -0,0 +1,259 @@
++import { APIRequestContext, expect, Page, test } from '@playwright/test';
++
++// Plan names are seed data (SPEC-US-03 AC-01 / AC-07 examples).
++const PLAN: Record<string, string> = { co: 'Plan Estándar', cl: 'Plan Full' };
++const CURRENCY_DIGITS = (s: string) => s.replace(/\D/g, '');
++
++const year = new Date().getFullYear() - 2; // vehicle age 2: no surcharge (SPEC-US-02 AC-05)
++
++// Fictitious step 1 values per country (keys come from the seeded form configuration).
++const STEP1: Record<string, Record<string, string | number | boolean>> = {
++  co: {
++    documentType: 'CC',
++    documentNumber: '1111111111',
++    firstName: 'Ana',
++    lastName: 'Prueba',
++    birthDate: '1990-01-15',
++    email: 'ana.prueba@example.test',
++    phone: '3001234567',
++    city: 'bogota',
++    acceptDataPolicy: true,
++    plate: 'ABC123',
++    brand: 'toyota',
++    model: 'Modelo Uno',
++    year,
++    mileage: 12000,
++  },
++  cl: {
++    firstName: 'Luis',
++    lastName: 'Prueba',
++    documentNumber: '11.111.111-1',
++    birthDate: '1990-01-15',
++    phone: '912345678',
++    email: 'luis.prueba@example.test',
++    city: 'santiago',
++    plate: 'ABCD12',
++    year,
++    brand: 'toyota',
++    model: 'Modelo Uno',
++    mileage: 12000,
++  },
++};
++
++interface PlanInfo {
++  documentId: string;
++  basePrice: number;
++}
++
++async function planInfo(request: APIRequestContext, cc: string): Promise<PlanInfo> {
++  const res = await request.get('/api/plans', {
++    params: {
++      'filters[country][code][$eq]': cc.toUpperCase(),
++      'filters[name][$eq]': PLAN[cc],
++    },
++  });
++  return (await res.json()).data[0] as PlanInfo;
++}
++
++/** Seeds the ADR-004 storage shape before the app boots (only if nothing is stored yet). */
++async function seedState(page: Page, cc: string, planDocumentId: string | null, values = STEP1[cc]) {
++  const key = `quote:v1:${cc.toUpperCase()}`;
++  const value = JSON.stringify({ v: 1, country: cc.toUpperCase(), values, planDocumentId });
++  await page.addInitScript(
++    ([k, v]) => {
++      if (sessionStorage.getItem(k) === null) sessionStorage.setItem(k, v);
++    },
++    [key, value],
++  );
++}
++
++async function openSummary(page: Page, request: APIRequestContext, cc: string) {
++  await seedState(page, cc, (await planInfo(request, cc)).documentId);
++  await page.goto(`/${cc}/resumen`);
++  await expect(page.getByTestId('summary-plan-name')).toBeVisible();
++}
++
++const payButton = (page: Page) => page.getByRole('button', { name: 'Pagar', exact: true });
++const terms = (page: Page) => page.getByRole('checkbox', { name: 'Acepto los términos y condiciones' });
++
++async function openGateway(page: Page) {
++  await terms(page).check();
++  await payButton(page).click();
++  await expect(page.getByTestId('gateway')).toBeVisible();
++}
++
++test.describe('US-03 summary and payment (e2e)', () => {
++  for (const cc of ['co', 'cl']) {
++    const CC = cc.toUpperCase();
++
++    // BUG: TW-BUG-01 summaryGuard NG0203 blocks every summary entry with valid step 1
++    test(`US-03-AC-01 summary shows policyholder, vehicle and plan with final price (${cc})`, async ({ page, request }) => {
++      const plan = await planInfo(request, cc);
++      await seedState(page, cc, plan.documentId);
++      await page.goto(`/${cc}/resumen`);
++      await expect(page.getByTestId('summary-policyholder')).toBeVisible();
++      await expect(page.getByTestId('summary-vehicle')).toBeVisible();
++      await expect(page.getByTestId('summary-plan-name')).toHaveText(PLAN[cc]);
++
++      // Every published field with a non-empty value has a row (labels come from the Strapi API).
++      const api = await (
++        await request.get(
++          `/api/form-fields?filters[country][code][$eq]=${CC}&pagination[pageSize]=100&populate[0]=options`,
++        )
++      ).json();
++      const expectedKeys = (api.data as Array<{ key: string }>)
++        .map((f) => f.key)
++        .filter((k) => STEP1[cc][k] !== undefined && STEP1[cc][k] !== '');
++      expect(expectedKeys.length).toBeGreaterThan(5);
++      for (const key of expectedKeys) {
++        await expect(page.getByTestId(`row-${key}`), `row for ${key}`).toBeVisible();
++      }
++      const draft = (api.data as Array<{ key: string }>).find((f) => f.key === 'draftOnlyField');
++      expect(draft).toBeUndefined();
++
++      // Price: vehicle age 2 -> no surcharge, so final price equals the base price (SPEC-US-02 AC-05).
++      const price = page.getByTestId('summary-price');
++      expect(CURRENCY_DIGITS(await price.innerText())).toBe(String(plan.basePrice));
++      const currency = (await (await request.get(`/api/countries?filters[code][$eq]=${CC}`)).json()).data[0].currency;
++      const expected = new Intl.NumberFormat(cc === 'co' ? 'es-CO' : 'es-CL', {
++        style: 'currency',
++        currency,
++        maximumFractionDigits: 0,
++      }).format(plan.basePrice);
++      expect((await price.innerText()).replace(/\s/g, ' ')).toBe(expected.replace(/\s/g, ' '));
++    });
++
++    test(`US-03-AC-02 terms from Strapi per country gate the pay button (${cc})`, async ({ page, request }) => {
++      const country = (await (await request.get(`/api/countries?filters[code][$eq]=${CC}`)).json()).data[0];
++      await openSummary(page, request, cc);
++      await expect(page.getByTestId('terms')).toContainText(country.termsTitle);
++      await expect(page.getByTestId('terms-body')).toHaveText(country.termsBody.trim(), { useInnerText: true });
++      await expect(payButton(page)).toBeDisabled();
++      await terms(page).check();
++      await expect(payButton(page)).toBeEnabled();
++      await terms(page).uncheck();
++      await expect(payButton(page)).toBeDisabled();
++    });
++
++    test(`US-03-AC-03 approved payment locks controls and shows quote number (${cc})`, async ({ page, request }) => {
++      await openSummary(page, request, cc);
++      await openGateway(page);
++      await page.getByRole('button', { name: 'Simular pago aprobado' }).click();
++      await expect(page.getByTestId('payment-processing')).toHaveText('Procesando pago…');
++      await expect(page.getByRole('button', { name: 'Simular pago aprobado' })).toBeDisabled();
++      await expect(page.getByRole('button', { name: 'Simular pago rechazado' })).toBeDisabled();
++      await expect(payButton(page)).toBeDisabled();
++      await expect(page).toHaveURL(new RegExp(`/${cc}/confirmacion$`));
++      await expect(page.getByTestId('quote-number')).toHaveText(new RegExp(`^COT-${CC}-\\d{8}-[A-Z0-9]{6}$`));
++    });
++
++    test(`US-03-AC-04 rejected payment keeps data and allows retry (${cc})`, async ({ page, request }) => {
++      await openSummary(page, request, cc);
++      await openGateway(page);
++      await page.getByRole('button', { name: 'Simular pago rechazado' }).click();
++      const alert = page.getByTestId('payment-rejected');
++      await expect(alert).toBeVisible();
++      await expect(alert).toHaveText(
++        'El pago fue rechazado. No se realizó ningún cobro. Puedes intentarlo de nuevo.', // seed copy payment.rejected
++      );
++      await expect(page).toHaveURL(new RegExp(`/${cc}/resumen$`));
++      await expect(page.getByTestId('summary-plan-name')).toHaveText(PLAN[cc]);
++      await expect(page.getByTestId('row-documentNumber')).toBeVisible();
++      await expect(terms(page)).toBeChecked();
++      await expect(payButton(page)).toBeEnabled();
++    });
++
++    test(`US-03-AC-05 masks document leaving last 4 characters (${cc})`, async ({ page, request }) => {
++      await openSummary(page, request, cc);
++      const shown = cc === 'co' ? '******1111' : '*****1111';
++      const entered = String(STEP1[cc]['documentNumber']);
++      await expect(page.getByTestId('row-documentNumber')).toContainText(shown);
++      const html = await page.content();
++      expect(html).not.toContain(entered);
++      expect(await page.evaluate(() => document.body.innerText)).not.toContain(entered);
++    });
++
++    test(`US-03-AC-06 edit data returns to step 1 with values (${cc})`, async ({ page, request }) => {
++      await openSummary(page, request, cc);
++      await page.getByRole('button', { name: 'Editar datos' }).click();
++      await expect(page).toHaveURL(new RegExp(`/${cc}/datos$`));
++      await expect(page.locator('#field-firstName')).toHaveValue(String(STEP1[cc]['firstName']));
++      await expect(page.locator('#field-documentNumber')).toHaveValue(String(STEP1[cc]['documentNumber']));
++      await expect(page.locator('#field-plate')).toHaveValue(String(STEP1[cc]['plate']));
++      await expect(page.locator('#field-year')).toHaveValue(String(year));
++      await expect(page.locator('#field-email')).toHaveValue(String(STEP1[cc]['email']));
++    });
++
++    test(`US-03-AC-07 change plan preselects current plan (${cc})`, async ({ page, request }) => {
++      await openSummary(page, request, cc);
++      await page.getByRole('button', { name: 'Cambiar plan' }).click();
++      await expect(page).toHaveURL(new RegExp(`/${cc}/planes$`));
++      await expect(page.getByRole('radio', { name: PLAN[cc], exact: true })).toBeChecked();
++    });
++  }
++
++  // BUG: TW-BUG-01 (summary unreachable)
++  test('US-03-AC-08 double click produces a single payment', async ({ page, request }) => {
++    await openSummary(page, request, 'co');
++    await openGateway(page);
++    await page.getByRole('button', { name: 'Simular pago aprobado' }).dblclick({ delay: 20 });
++    await expect(page).toHaveURL(/\/co\/confirmacion$/);
++    await expect(page.getByTestId('quote-number')).toHaveCount(1);
++    await expect(page.getByTestId('quote-number')).toHaveText(/^COT-CO-\d{8}-[A-Z0-9]{6}$/);
++  });
++
++  // BUG: TW-BUG-01 (summary unreachable)
++  test('US-03-AC-10 clears wizard state after approval', async ({ page, request }) => {
++    await openSummary(page, request, 'co');
++    await openGateway(page);
++    await page.getByRole('button', { name: 'Simular pago aprobado' }).click();
++    await expect(page).toHaveURL(/\/co\/confirmacion$/);
++    await expect(page.getByTestId('quote-number')).toBeVisible();
++    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('quote:v1:CO'))).toBeNull();
++    await page.goBack();
++    await expect(page).toHaveURL(/\/co\/datos$/);
++    await expect(page.locator('#field-firstName')).toHaveValue('');
++    await expect(page.locator('#field-documentNumber')).toHaveValue('');
++  });
++
++  test('US-03-AC-11 summary guard redirects to first incomplete step (no wizard state)', async ({ page }) => {
++    await page.goto('/cl/resumen');
++    await expect(page).toHaveURL(/\/cl\/datos$/);
++  });
++
++  // BUG: TW-BUG-01 (guard throws NG0203; lands on / instead of /cl/planes)
++  test('US-03-AC-11 summary guard redirects to first incomplete step (valid step 1, no plan)', async ({ page }) => {
++    await seedState(page, 'cl', null);
++    await page.goto('/cl/resumen');
++    await expect(page).toHaveURL(/\/cl\/planes$/);
++  });
++
++  // BUG: TW-BUG-01 (summary unreachable)
++  test('US-03-AC-12 gateway has no card inputs', async ({ page, request }) => {
++    await openSummary(page, request, 'co');
++    await openGateway(page);
++    const gateway = page.getByTestId('gateway');
++    await expect(gateway.locator('input, select, textarea')).toHaveCount(0);
++
++    const cardKeys = async () =>
++      page.evaluate(() => Object.keys(sessionStorage).concat(Object.keys(localStorage)).filter((k) => /card|cvv|cvc|pan|payment/i.test(k)));
++    await page.getByRole('button', { name: 'Simular pago rechazado' }).click();
++    await expect(page.getByTestId('payment-rejected')).toBeVisible();
++    expect(await cardKeys()).toEqual([]);
++
++    await payButton(page).click();
++    await page.getByRole('button', { name: 'Simular pago aprobado' }).click();
++    await expect(page).toHaveURL(/\/co\/confirmacion$/);
++    expect(await cardKeys()).toEqual([]);
++  });
++
++  test('US-03-AC-22 public write to countries is denied with 401 or 403', async ({ request }) => {
++    const denied = [401, 403];
++    const countryId: string = (await (await request.get('/api/countries?pagination[pageSize]=1')).json()).data[0].documentId;
++    const payload = { data: { code: 'ZZ', name: 'hacked' } };
++    expect(denied).toContain((await request.post('/api/countries', { data: payload })).status());
++    expect(denied).toContain((await request.put(`/api/countries/${countryId}`, { data: payload })).status());
++    expect(denied).toContain((await request.delete(`/api/countries/${countryId}`)).status());
++    expect((await request.get('/api/countries')).status()).toBe(200);
++  });
++});
+diff --git a/frontend/src/app/app.routes.ts b/frontend/src/app/app.routes.ts
+index 4904496..5091c51 100644
+--- a/frontend/src/app/app.routes.ts
++++ b/frontend/src/app/app.routes.ts
+@@ -1,7 +1,8 @@
+ import { Routes } from '@angular/router';
+ import { countryMatchGuard } from './core/country-match-guard';
+ import { plansGuard } from './features/plan-list/plans-guard';
+-import { STEPS } from './shared/steps';
++import { confirmationGuard } from './features/confirmation/confirmation-guard';
++import { summaryGuard } from './features/summary/summary-guard';
+ 
+ /** ADR-002 routes. Step components are placeholders until the features replace them. */
+ export const routes: Routes = [
+@@ -26,11 +27,18 @@ export const routes: Routes = [
+         runGuardsAndResolvers: 'always',
+         loadComponent: () => import('./features/plan-list/plan-list').then((m) => m.PlanList),
+       },
+-      ...STEPS.filter((step) => step !== 'datos' && step !== 'planes').map((step) => ({
+-        path: step,
+-        data: { step },
+-        loadComponent: () => import('./shared/step-placeholder').then((m) => m.StepPlaceholder),
+-      })),
++      {
++        path: 'resumen',
++        canActivate: [summaryGuard],
++        runGuardsAndResolvers: 'always',
++        loadComponent: () => import('./features/summary/summary').then((m) => m.Summary),
++      },
++      {
++        path: 'confirmacion',
++        canActivate: [confirmationGuard],
++        loadComponent: () =>
++          import('./features/confirmation/confirmation').then((m) => m.Confirmation),
++      },
+       { path: '', pathMatch: 'full', redirectTo: 'datos' },
+     ],
+   },
+diff --git a/frontend/src/app/features/confirmation/confirmation-guard.ts b/frontend/src/app/features/confirmation/confirmation-guard.ts
+new file mode 100644
+index 0000000..444556c
+--- /dev/null
++++ b/frontend/src/app/features/confirmation/confirmation-guard.ts
+@@ -0,0 +1,16 @@
++import { inject } from '@angular/core';
++import { CanActivateFn, Router } from '@angular/router';
++import { CountryContext } from '../../core/country-context';
++import { ConfirmationStore } from '../summary/confirmation-store';
++
++/** GAP-22: no confirmation in memory for this country redirects to `/{cc}/datos`. */
++export const confirmationGuard: CanActivateFn = () => {
++  const country = inject(CountryContext).current();
++  if (!country) {
++    return true;
++  }
++  const confirmation = inject(ConfirmationStore).current();
++  return confirmation?.countryCode === country.code
++    ? true
++    : inject(Router).createUrlTree(['/', country.code.toLowerCase(), 'datos']);
++};
+diff --git a/frontend/src/app/features/confirmation/confirmation.ts b/frontend/src/app/features/confirmation/confirmation.ts
+new file mode 100644
+index 0000000..b9e5b91
+--- /dev/null
++++ b/frontend/src/app/features/confirmation/confirmation.ts
+@@ -0,0 +1,55 @@
++import { ChangeDetectionStrategy, Component, ElementRef, afterNextRender, inject, viewChild } from '@angular/core';
++import { Router } from '@angular/router';
++import { CountryContext } from '../../core/country-context';
++import { ConfirmationStore } from '../summary/confirmation-store';
++
++/** Confirmation after an approved simulated payment (SPEC-US-03); data is memory only (GAP-22). */
++@Component({
++  selector: 'app-confirmation',
++  changeDetection: ChangeDetectionStrategy.OnPush,
++  template: `
++    <section class="page confirmation">
++      @if (confirmation(); as c) {
++        <h1 #heading tabindex="-1">{{ text('confirmation.title') }}</h1>
++        <dl>
++          <dt>{{ text('confirmation.quoteNumberLabel') }}</dt>
++          <dd data-testid="quote-number">{{ c.quoteNumber }}</dd>
++          <dt>{{ text('summary.planTitle') }}</dt>
++          <dd data-testid="confirmation-plan">{{ c.planName }}</dd>
++          <dt>{{ text('summary.priceLabel') }}</dt>
++          <dd data-testid="confirmation-price">{{ c.formattedPrice }}</dd>
++        </dl>
++        <button type="button" class="button" (click)="newQuote()">{{ text('confirmation.newQuote') }}</button>
++      }
++    </section>
++  `,
++})
++export class Confirmation {
++  private readonly country = inject(CountryContext).current;
++  private readonly confirmations = inject(ConfirmationStore);
++  private readonly router = inject(Router);
++  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
++
++  protected readonly confirmation = this.confirmations.current;
++
++  constructor() {
++    afterNextRender(() => this.heading()?.nativeElement.focus());
++  }
++
++  protected text(key: string): string {
++    const value = this.country()?.copy[key];
++    if (value === undefined) {
++      console.warn(`Missing copy key: ${key}`);
++      return '';
++    }
++    return value;
++  }
++
++  protected newQuote(): void {
++    const code = this.country()?.code.toLowerCase();
++    this.confirmations.clear();
++    if (code) {
++      void this.router.navigate(['/', code, 'datos']);
++    }
++  }
++}
+diff --git a/frontend/src/app/features/summary/confirmation-store.ts b/frontend/src/app/features/summary/confirmation-store.ts
+new file mode 100644
+index 0000000..0e30583
+--- /dev/null
++++ b/frontend/src/app/features/summary/confirmation-store.ts
+@@ -0,0 +1,23 @@
++import { Injectable, signal } from '@angular/core';
++
++export interface Confirmation {
++  countryCode: string;
++  quoteNumber: string;
++  planName: string;
++  formattedPrice: string;
++}
++
++/** GAP-22: confirmation lives in memory only; never persisted. */
++@Injectable({ providedIn: 'root' })
++export class ConfirmationStore {
++  private readonly value = signal<Confirmation | null>(null);
++  readonly current = this.value.asReadonly();
++
++  set(confirmation: Confirmation): void {
++    this.value.set(confirmation);
++  }
++
++  clear(): void {
++    this.value.set(null);
++  }
++}
+diff --git a/frontend/src/app/features/summary/mask.ts b/frontend/src/app/features/summary/mask.ts
+new file mode 100644
+index 0000000..4ba1d7d
+--- /dev/null
++++ b/frontend/src/app/features/summary/mask.ts
+@@ -0,0 +1,9 @@
++/**
++ * SPEC-US-03 section 5: normalize (drop spaces, dots, hyphens; upper-case), then keep only the
++ * last 4 characters visible. Values of 4 characters or fewer are fully masked.
++ */
++export function maskDocument(value: string): string {
++  const normalized = value.replace(/[\s.\-]/g, '').toUpperCase();
++  const n = normalized.length;
++  return n > 4 ? '*'.repeat(n - 4) + normalized.slice(-4) : '*'.repeat(n);
++}
+diff --git a/frontend/src/app/features/summary/payment-settings.ts b/frontend/src/app/features/summary/payment-settings.ts
+new file mode 100644
+index 0000000..4b76165
+--- /dev/null
++++ b/frontend/src/app/features/summary/payment-settings.ts
+@@ -0,0 +1,7 @@
++import { InjectionToken } from '@angular/core';
++
++/** Simulated gateway processing time (SPEC-US-03 testability note); overridable in unit tests. */
++export const PAYMENT_DELAY_MS = new InjectionToken<number>('PAYMENT_DELAY_MS', {
++  providedIn: 'root',
++  factory: () => 1500,
++});
+diff --git a/frontend/src/app/features/summary/quote-number.ts b/frontend/src/app/features/summary/quote-number.ts
+new file mode 100644
+index 0000000..6d922e1
+--- /dev/null
++++ b/frontend/src/app/features/summary/quote-number.ts
+@@ -0,0 +1,12 @@
++const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
++
++/** SPEC-US-03 GAP-21: `COT-{CC}-{YYYYMMDD}-{6 chars [A-Z0-9]}`; local date, crypto randomness. */
++export function generateQuoteNumber(countryCode: string, now: Date): string {
++  const yyyy = String(now.getFullYear()).padStart(4, '0');
++  const mm = String(now.getMonth() + 1).padStart(2, '0');
++  const dd = String(now.getDate()).padStart(2, '0');
++  const bytes = new Uint8Array(6);
++  crypto.getRandomValues(bytes);
++  const suffix = Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join('');
++  return `COT-${countryCode.toUpperCase()}-${yyyy}${mm}${dd}-${suffix}`;
++}
+diff --git a/frontend/src/app/features/summary/summary-guard.spec.ts b/frontend/src/app/features/summary/summary-guard.spec.ts
+new file mode 100644
+index 0000000..1477a1d
+--- /dev/null
++++ b/frontend/src/app/features/summary/summary-guard.spec.ts
+@@ -0,0 +1,63 @@
++import { TestBed } from '@angular/core/testing';
++import { ActivatedRouteSnapshot, provideRouter, RouterStateSnapshot, UrlTree } from '@angular/router';
++import { of } from 'rxjs';
++import { CLOCK } from '../../core/clock';
++import { CountryContext } from '../../core/country-context';
++import { CountryRaw } from '../../core/country-config';
++import { QuoteStore } from '../../core/quote-store';
++import { StrapiClient } from '../../core/strapi-client';
++import { summaryGuard } from './summary-guard';
++
++const country: CountryRaw = {
++  code: 'XX',
++  name: 'Testland',
++  numberLocale: 'es-CO',
++  currency: 'COP',
++  legalAge: 18,
++  copy: [],
++};
++
++async function run(planDocumentId: string | null): Promise<unknown> {
++  const get = vi.fn((path: string) => {
++    if (path.startsWith('/countries')) return of({ data: [country] });
++    if (path.startsWith('/form-fields')) {
++      return of({ data: [{ key: 'firstName', label: 'Name', type: 'text', order: 1, group: 'policyholder' }] });
++    }
++    throw new Error(`unexpected ${path}`);
++  });
++  TestBed.configureTestingModule({
++    providers: [
++      provideRouter([]),
++      { provide: StrapiClient, useValue: { get } },
++      { provide: CLOCK, useValue: () => new Date(2026, 10, 23) },
++    ],
++  });
++  await TestBed.inject(CountryContext).resolve('XX');
++  const store = TestBed.inject(QuoteStore);
++  store.activate('XX');
++  store.setApplicant({ firstName: 'Ana' });
++  store.selectPlan(planDocumentId);
++  return TestBed.runInInjectionContext(() =>
++    summaryGuard({} as ActivatedRouteSnapshot, { url: '/xx/resumen' } as RouterStateSnapshot),
++  );
++}
++
++describe('US-03 summary guard (unit)', () => {
++  beforeEach(() => {
++    sessionStorage.clear();
++    TestBed.resetTestingModule();
++  });
++
++  // BUG: summaryGuard calls inject() after `await plansGuard(...)`, outside the injection context (NG0203),
++  // so the guard rejects whenever step 1 is valid. See TW-BUG-01.
++  it('US-03-AC-11 summary guard allows entry when step 1 is valid and a plan is selected', async () => {
++    await expect(run('plan-1')).resolves.toBe(true);
++  });
++
++  // BUG: same cause as above (TW-BUG-01).
++  it('US-03-AC-11 summary guard redirects to planes when step 1 is valid and no plan is selected', async () => {
++    const result = await run(null);
++    expect(result).toBeInstanceOf(UrlTree);
++    expect(String(result)).toBe('/xx/planes');
++  });
++});
+diff --git a/frontend/src/app/features/summary/summary-guard.ts b/frontend/src/app/features/summary/summary-guard.ts
+new file mode 100644
+index 0000000..bd09840
+--- /dev/null
++++ b/frontend/src/app/features/summary/summary-guard.ts
+@@ -0,0 +1,18 @@
++import { inject } from '@angular/core';
++import { CanActivateFn, GuardResult, Router } from '@angular/router';
++import { CountryContext } from '../../core/country-context';
++import { QuoteStore } from '../../core/quote-store';
++import { plansGuard } from '../plan-list/plans-guard';
++
++/** GAP-05: step 3 needs a valid step 1 (via plansGuard) and a selected plan, else redirect to the first incomplete step. */
++export const summaryGuard: CanActivateFn = async (route, state) => {
++  const result = (await plansGuard(route, state)) as GuardResult;
++  if (result !== true) {
++    return result;
++  }
++  const country = inject(CountryContext).current();
++  if (country && inject(QuoteStore).planDocumentId() === null) {
++    return inject(Router).createUrlTree(['/', country.code.toLowerCase(), 'planes']);
++  }
++  return true;
++};
+diff --git a/frontend/src/app/features/summary/summary-model.ts b/frontend/src/app/features/summary/summary-model.ts
+new file mode 100644
+index 0000000..2959586
+--- /dev/null
++++ b/frontend/src/app/features/summary/summary-model.ts
+@@ -0,0 +1,59 @@
++import { FormFieldConfig } from '../applicant-form/form-field-config';
++import { QuoteValue } from '../../core/quote-store';
++import { maskDocument } from './mask';
++
++export interface SummaryRow {
++  key: string;
++  label: string;
++  displayValue: string;
++  masked: boolean;
++}
++
++export interface SummaryFormatOptions {
++  numberLocale: string;
++  yes: string;
++  no: string;
++}
++
++function isEmpty(value: QuoteValue | undefined): value is null | undefined {
++  return value === undefined || value === null || value === '';
++}
++
++function formatDate(iso: string, locale: string): string {
++  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
++  if (!match) {
++    return iso;
++  }
++  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
++  return new Intl.DateTimeFormat(locale).format(date);
++}
++
++/** GAP-14 display rules: published fields of one group, ordered, empty values omitted. */
++export function buildRows(
++  fields: readonly FormFieldConfig[],
++  values: Readonly<Record<string, QuoteValue>>,
++  group: FormFieldConfig['group'],
++  options: SummaryFormatOptions,
++): SummaryRow[] {
++  const rows: SummaryRow[] = [];
++  for (const field of fields.filter((f) => f.group === group)) {
++    const value = values[field.key];
++    if (isEmpty(value)) {
++      continue;
++    }
++    let displayValue: string;
++    if (field.maskInSummary) {
++      displayValue = maskDocument(String(value));
++    } else if (field.type === 'select') {
++      displayValue = field.options.find((o) => o.value === String(value))?.label ?? String(value);
++    } else if (field.type === 'date') {
++      displayValue = formatDate(String(value), options.numberLocale);
++    } else if (field.type === 'checkbox') {
++      displayValue = value === true ? options.yes : options.no;
++    } else {
++      displayValue = String(value);
++    }
++    rows.push({ key: field.key, label: field.label, displayValue, masked: field.maskInSummary });
++  }
++  return rows;
++}
+diff --git a/frontend/src/app/features/summary/summary.css b/frontend/src/app/features/summary/summary.css
+new file mode 100644
+index 0000000..5586513
+--- /dev/null
++++ b/frontend/src/app/features/summary/summary.css
+@@ -0,0 +1,116 @@
++.summary__layout {
++  display: grid;
++  gap: 1.5rem;
++}
++
++.summary__side {
++  display: grid;
++  gap: 1rem;
++  align-content: start;
++}
++
++.summary__list {
++  margin: 0;
++}
++
++.summary__row {
++  display: grid;
++  gap: 0.125rem;
++  padding: 0.5rem 0;
++  border-bottom: 1px solid #c3c9d0;
++}
++
++.summary__row dt {
++  color: var(--color-muted);
++  font-size: 0.875rem;
++}
++
++.summary__row dd {
++  margin: 0;
++  font-weight: 600;
++  overflow-wrap: anywhere;
++}
++
++.summary__plan-name {
++  margin: 0;
++  font-size: 1.25rem;
++  font-weight: 700;
++}
++
++.summary__alert {
++  margin: 0;
++  padding: 0.75rem 1rem;
++  border: 2px solid #b00020;
++  border-radius: 0.5rem;
++  color: #b00020;
++  font-weight: 600;
++}
++
++.terms__body {
++  max-height: 12rem;
++  overflow-y: auto;
++  padding: 0.75rem;
++  border: 1px solid #6b7480;
++  border-radius: 0.5rem;
++  background: #fff;
++  white-space: pre-line;
++}
++
++.terms__body:focus-visible,
++.terms__accept input:focus-visible {
++  outline: 3px solid var(--color-primary);
++  outline-offset: 2px;
++}
++
++.terms__accept {
++  display: flex;
++  align-items: center;
++  gap: 0.75rem;
++  min-height: 44px;
++}
++
++.terms__accept input {
++  width: 1.5rem;
++  height: 1.5rem;
++  margin: 0;
++}
++
++.gateway {
++  display: grid;
++  gap: 0.75rem;
++  padding: 1rem;
++  border: 2px dashed var(--color-primary);
++  border-radius: 0.75rem;
++}
++
++.gateway h2 {
++  margin: 0;
++}
++
++.actions {
++  display: flex;
++  gap: 0.75rem;
++  flex-wrap: wrap;
++}
++
++.button {
++  min-height: 44px;
++  min-width: 44px;
++}
++
++.button--secondary {
++  background: transparent;
++  color: var(--color-text);
++  border: 2px solid var(--color-primary);
++}
++
++.button:disabled {
++  opacity: 0.5;
++  cursor: not-allowed;
++}
++
++@media (min-width: 768px) {
++  .summary__layout {
++    grid-template-columns: 1fr 1fr;
++  }
++}
+diff --git a/frontend/src/app/features/summary/summary.html b/frontend/src/app/features/summary/summary.html
+new file mode 100644
+index 0000000..6cf203e
+--- /dev/null
++++ b/frontend/src/app/features/summary/summary.html
+@@ -0,0 +1,125 @@
++<section class="page summary" [attr.aria-busy]="resource.isLoading()">
++  @if (country()) {
++    <h1 #heading tabindex="-1">{{ text('summary.title', '') }}</h1>
++  }
++
++  <div aria-live="polite" class="summary__status">
++    @if (!country()) {
++      <p data-testid="summary-error">{{ fallback.error }}</p>
++    } @else if (resource.isLoading()) {
++      <p data-testid="summary-loading">{{ text('summary.loading', fallback.loading) }}</p>
++    } @else if (resource.error()) {
++      <p data-testid="summary-error">{{ text('summary.error', fallback.error) }}</p>
++    } @else if (locked()) {
++      <p data-testid="payment-processing">{{ text('payment.processing', '') }}</p>
++    }
++  </div>
++
++  @if (!country()) {
++    <button type="button" class="button" (click)="retry()">{{ fallback.retry }}</button>
++  } @else if (resource.isLoading()) {
++    <!-- status text is in the live region above -->
++  } @else if (resource.error()) {
++    <button type="button" class="button" (click)="retry()">{{ text('common.retry', fallback.retry) }}</button>
++  } @else if (planUnavailable()) {
++    <p data-testid="plan-unavailable" role="alert">{{ text('summary.planUnavailable', '') }}</p>
++    <div class="actions">
++      <button type="button" class="button" (click)="changePlan()">{{ text('summary.changePlan', '') }}</button>
++    </div>
++  } @else if (view(); as v) {
++    <div class="summary__layout">
++      <div class="summary__data">
++        <section aria-labelledby="summary-policyholder" data-testid="summary-policyholder">
++          <h2 id="summary-policyholder">{{ text('summary.policyholderTitle', '') }}</h2>
++          <dl class="summary__list">
++            @for (row of v.policyholder; track row.key) {
++              <div class="summary__row" [attr.data-testid]="'row-' + row.key">
++                <dt>{{ row.label }}</dt>
++                <dd>{{ row.displayValue }}</dd>
++              </div>
++            }
++          </dl>
++        </section>
++
++        <section aria-labelledby="summary-vehicle" data-testid="summary-vehicle">
++          <h2 id="summary-vehicle">{{ text('summary.vehicleTitle', '') }}</h2>
++          <dl class="summary__list">
++            @for (row of v.vehicle; track row.key) {
++              <div class="summary__row" [attr.data-testid]="'row-' + row.key">
++                <dt>{{ row.label }}</dt>
++                <dd>{{ row.displayValue }}</dd>
++              </div>
++            }
++          </dl>
++        </section>
++      </div>
++
++      <div class="summary__side">
++        <section aria-labelledby="summary-plan" data-testid="summary-plan">
++          <h2 id="summary-plan">{{ text('summary.planTitle', '') }}</h2>
++          <p class="summary__plan-name" data-testid="summary-plan-name">{{ v.plan.name }}</p>
++          <p>
++            <span>{{ text('summary.priceLabel', '') }}</span>
++            <strong data-testid="summary-price">{{ v.formattedPrice }}</strong>
++          </p>
++        </section>
++
++        <div class="actions">
++          <button type="button" class="button button--secondary" [disabled]="locked()" (click)="editData()">
++            {{ text('summary.editData', '') }}
++          </button>
++          <button type="button" class="button button--secondary" [disabled]="locked()" (click)="changePlan()">
++            {{ text('summary.changePlan', '') }}
++          </button>
++        </div>
++
++        @if (termsAvailable()) {
++          <section class="terms" aria-labelledby="terms-title" data-testid="terms">
++            <h2 id="terms-title">{{ country()!.termsTitle }}</h2>
++            <div class="terms__body" role="region" aria-labelledby="terms-title" tabindex="0" data-testid="terms-body">{{ country()!.termsBody }}</div>
++          </section>
++        } @else {
++          <p data-testid="terms-unavailable" role="alert">{{ text('summary.termsUnavailable', '') }}</p>
++        }
++
++        <div class="terms__accept">
++          <input
++            id="terms-accept"
++            type="checkbox"
++            [checked]="accepted()"
++            [disabled]="locked() || !termsAvailable()"
++            (change)="setAccepted($event)"
++          />
++          <label for="terms-accept">{{ text('summary.termsAccept', '') }}</label>
++        </div>
++
++        @if (state() === 'rejected') {
++          <p #alert class="summary__alert" role="alert" tabindex="-1" data-testid="payment-rejected">
++            {{ text('payment.rejected', '') }}
++          </p>
++        }
++
++        <button #payButton type="button" class="button" [disabled]="!canPay()" (click)="openGateway()">
++          {{ text('payment.pay', '') }}
++        </button>
++
++        @if (state() === 'gateway' || state() === 'processing') {
++          <section class="gateway" aria-labelledby="gateway-title" data-testid="gateway">
++            <h2 #gatewayHeading id="gateway-title" tabindex="-1">{{ text('payment.gatewayTitle', '') }}</h2>
++            <div class="actions">
++              <button type="button" class="button" [disabled]="locked()" (click)="simulate('approved')">
++                {{ text('payment.simulateApprove', '') }}
++              </button>
++              <button type="button" class="button" [disabled]="locked()" (click)="simulate('rejected')">
++                {{ text('payment.simulateReject', '') }}
++              </button>
++              <button type="button" class="button button--secondary" [disabled]="locked()" (click)="cancel()">
++                {{ text('payment.cancel', '') }}
++              </button>
++            </div>
++          </section>
++        }
++      </div>
++    </div>
++  }
++</section>
+diff --git a/frontend/src/app/features/summary/summary.spec.ts b/frontend/src/app/features/summary/summary.spec.ts
+new file mode 100644
+index 0000000..ae4fae4
+--- /dev/null
++++ b/frontend/src/app/features/summary/summary.spec.ts
+@@ -0,0 +1,189 @@
++import { ComponentFixture, TestBed } from '@angular/core/testing';
++import { provideRouter, Router } from '@angular/router';
++import { of } from 'rxjs';
++import { CLOCK } from '../../core/clock';
++import { CountryContext } from '../../core/country-context';
++import { CountryRaw } from '../../core/country-config';
++import { QuoteStore } from '../../core/quote-store';
++import { StrapiClient } from '../../core/strapi-client';
++import { FormFieldConfig, FormFieldRaw } from '../applicant-form/form-field-config';
++import { PlanRaw } from '../plan-list/plan';
++import { ConfirmationStore } from './confirmation-store';
++import { maskDocument } from './mask';
++import { PAYMENT_DELAY_MS } from './payment-settings';
++import { generateQuoteNumber } from './quote-number';
++import { Summary } from './summary';
++import { buildRows } from './summary-model';
++
++const TODAY = new Date(2026, 10, 23);
++
++const COPY = [
++  ['summary.title', 'TITLE'],
++  ['summary.loading', 'LOADING'],
++  ['summary.policyholderTitle', 'HOLDER'],
++  ['summary.vehicleTitle', 'VEHICLE'],
++  ['summary.planTitle', 'PLAN'],
++  ['summary.priceLabel', 'PRICE'],
++  ['summary.editData', 'EDIT'],
++  ['summary.changePlan', 'CHANGE'],
++  ['summary.termsAccept', 'ACCEPT'],
++  ['summary.termsUnavailable', 'NO-TERMS'],
++  ['payment.pay', 'PAY'],
++  ['payment.gatewayTitle', 'GATEWAY'],
++  ['payment.simulateApprove', 'APPROVE'],
++  ['payment.simulateReject', 'REJECT'],
++  ['payment.cancel', 'CANCEL'],
++  ['payment.processing', 'PROCESSING'],
++  ['payment.rejected', 'REJECTED'],
++].map(([key, value]) => ({ key, value }));
++
++const country = (over: Partial<CountryRaw> = {}): CountryRaw => ({
++  code: 'XX',
++  name: 'Testland',
++  numberLocale: 'es-CO',
++  currency: 'COP',
++  legalAge: 18,
++  termsTitle: 'TERMS-TITLE',
++  termsBody: 'TERMS-BODY',
++  copy: COPY,
++  ...over,
++});
++
++const plan: PlanRaw = {
++  documentId: 'plan-1',
++  name: 'Plan Uno',
++  shortDescription: null,
++  basePrice: 1000,
++  currency: 'COP',
++  order: 1,
++  recommended: false,
++  coverages: [],
++  benefits: [],
++};
++
++const fields: FormFieldRaw[] = [
++  { key: 'documentNumber', label: 'Doc', type: 'text', order: 1, group: 'policyholder', maskInSummary: true },
++  { key: 'year', label: 'Year', type: 'number', order: 2, group: 'vehicle', validations: [{ type: 'vehicleYear' }] },
++];
++
++async function setup(
++  countryRaw: CountryRaw,
++  delayMs = 1500,
++): Promise<{ fixture: ComponentFixture<Summary>; el: HTMLElement; set: ReturnType<typeof vi.spyOn> }> {
++  const get = vi.fn((path: string) => {
++    if (path.startsWith('/countries')) return of({ data: [countryRaw] });
++    if (path.startsWith('/form-fields')) return of({ data: fields });
++    if (path.startsWith('/plans')) return of({ data: [plan] });
++    throw new Error(`unexpected ${path}`);
++  });
++  TestBed.configureTestingModule({
++    providers: [
++      provideRouter([]),
++      { provide: StrapiClient, useValue: { get } },
++      { provide: CLOCK, useValue: () => TODAY },
++      { provide: PAYMENT_DELAY_MS, useValue: delayMs },
++    ],
++  });
++  await TestBed.inject(CountryContext).resolve('XX');
++  const store = TestBed.inject(QuoteStore);
++  store.activate('XX');
++  store.setApplicant({ documentNumber: '1111111111', year: 2023 });
++  store.selectPlan('plan-1');
++  vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
++  const set = vi.spyOn(TestBed.inject(ConfirmationStore), 'set');
++  const fixture = TestBed.createComponent(Summary);
++  fixture.detectChanges();
++  await fixture.whenStable();
++  fixture.detectChanges();
++  return { fixture, el: fixture.nativeElement as HTMLElement, set };
++}
++
++const button = (el: HTMLElement, label: string) =>
++  Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === label) as HTMLButtonElement;
++
++describe('US-03 summary (unit)', () => {
++  beforeEach(() => {
++    sessionStorage.clear();
++    TestBed.resetTestingModule();
++  });
++  afterEach(() => vi.useRealTimers());
++
++  describe('US-03-AC-05 masks document leaving last 4 characters', () => {
++    it('US-03-AC-05 masks document leaving last 4 characters (CO)', () => {
++      expect(maskDocument('1111111111')).toBe('******1111');
++    });
++    it('US-03-AC-05 masks document leaving last 4 characters (CL, dots and hyphen removed)', () => {
++      expect(maskDocument('11.111.111-1')).toBe('*****1111');
++    });
++    it('US-03-AC-05 masks document leaving last 4 characters (upper-cases letters, drops spaces)', () => {
++      // normalized "12345678K" (9 chars): 5 asterisks + last 4 "678K"
++      expect(maskDocument('12.345.678-k')).toBe('*****678K');
++      expect(maskDocument(' 11 222 ')).toBe('*1222');
++    });
++    it('US-03-AC-05 masks document leaving last 4 characters (short values fully masked)', () => {
++      expect(maskDocument('1234')).toBe('****');
++      expect(maskDocument('12')).toBe('**');
++    });
++    it('US-03-AC-05 masks document leaving last 4 characters (row chosen by maskInSummary only)', () => {
++      const cfg = [
++        { key: 'documentNumber', label: 'Doc', type: 'text', group: 'policyholder', maskInSummary: true, options: [], validations: [] },
++        { key: 'phone', label: 'Phone', type: 'text', group: 'policyholder', maskInSummary: false, options: [], validations: [] },
++      ] as unknown as FormFieldConfig[];
++      const rows = buildRows(cfg, { documentNumber: '1111111111', phone: '3001234567' }, 'policyholder', {
++        numberLocale: 'es-CO',
++        yes: 'Si',
++        no: 'No',
++      });
++      expect(rows.find((r) => r.key === 'documentNumber')?.displayValue).toBe('******1111');
++      expect(rows.find((r) => r.key === 'phone')?.displayValue).toBe('3001234567');
++    });
++    it('US-03-AC-05 masks document leaving last 4 characters (full value not in rendered DOM)', async () => {
++      const { el } = await setup(country());
++      expect(el.textContent).toContain('******1111');
++      expect(el.innerHTML).not.toContain('1111111111');
++    });
++  });
++
++  describe('US-03-AC-09 quote number matches pattern', () => {
++    it('US-03-AC-09 quote number matches pattern (CL, fixed clock 2026-11-23)', () => {
++      expect(generateQuoteNumber('CL', new Date(2026, 10, 23))).toMatch(/^COT-CL-20261123-[A-Z0-9]{6}$/);
++    });
++    it('US-03-AC-09 quote number matches pattern (CO, zero-padded date)', () => {
++      expect(generateQuoteNumber('CO', new Date(2026, 0, 5))).toMatch(/^COT-CO-20260105-[A-Z0-9]{6}$/);
++    });
++    it('US-03-AC-09 quote number matches pattern (random suffix varies)', () => {
++      const all = new Set(Array.from({ length: 20 }, () => generateQuoteNumber('CO', TODAY)));
++      expect(all.size).toBeGreaterThan(1);
++    });
++  });
++
++  it('US-03-AC-08 double click produces a single payment', async () => {
++    const { fixture, el, set } = await setup(country(), 1500);
++    vi.useFakeTimers();
++    (el.querySelector('#terms-accept') as HTMLInputElement).click();
++    fixture.detectChanges();
++    button(el, 'PAY').click();
++    fixture.detectChanges();
++    const approve = button(el, 'APPROVE');
++    approve.click();
++    approve.click();
++    fixture.detectChanges();
++    await vi.advanceTimersByTimeAsync(5000);
++    fixture.detectChanges();
++    expect(set).toHaveBeenCalledTimes(1);
++    expect(set.mock.calls[0][0].quoteNumber).toMatch(/^COT-XX-20261123-[A-Z0-9]{6}$/);
++  });
++
++  it('US-03-AC-14 missing terms disable payment', async () => {
++    const { el } = await setup(country({ termsBody: '' }));
++    expect(el.querySelector('[data-testid="terms-unavailable"]')?.textContent).toContain('NO-TERMS');
++    expect((el.querySelector('#terms-accept') as HTMLInputElement).disabled).toBe(true);
++    expect(button(el, 'PAY').disabled).toBe(true);
++  });
++
++  it('US-03-AC-14 missing terms disable payment (null termsBody)', async () => {
++    const { el } = await setup(country({ termsBody: null }));
++    expect(el.querySelector('[data-testid="terms-unavailable"]')).not.toBeNull();
++    expect(button(el, 'PAY').disabled).toBe(true);
++  });
++});
+diff --git a/frontend/src/app/features/summary/summary.ts b/frontend/src/app/features/summary/summary.ts
+new file mode 100644
+index 0000000..18f6c68
+--- /dev/null
++++ b/frontend/src/app/features/summary/summary.ts
+@@ -0,0 +1,253 @@
++import {
++  ChangeDetectionStrategy,
++  Component,
++  DestroyRef,
++  ElementRef,
++  Injector,
++  afterNextRender,
++  computed,
++  effect,
++  inject,
++  signal,
++  viewChild,
++} from '@angular/core';
++import { rxResource } from '@angular/core/rxjs-interop';
++import { ActivatedRoute, Router } from '@angular/router';
++import { forkJoin } from 'rxjs';
++import { CLOCK } from '../../core/clock';
++import { resolveAndActivate } from '../../core/country-activation';
++import { CountryContext } from '../../core/country-context';
++import { QuoteStore } from '../../core/quote-store';
++import { FALLBACK_COPY } from '../../core/site-copy';
++import { ApplicantFormApi } from '../applicant-form/applicant-form-api';
++import { PlanListApi } from '../plan-list/plan-list-api';
++import { computeFinalPrice } from '../plan-list/pricing';
++import { ConfirmationStore } from './confirmation-store';
++import { PAYMENT_DELAY_MS } from './payment-settings';
++import { generateQuoteNumber } from './quote-number';
++import { buildRows } from './summary-model';
++
++export type PaymentState = 'idle' | 'gateway' | 'processing' | 'rejected' | 'approved';
++
++/** Step 3: summary, terms and simulated payment (SPEC-US-03). */
++@Component({
++  selector: 'app-summary',
++  templateUrl: './summary.html',
++  styleUrl: './summary.css',
++  changeDetection: ChangeDetectionStrategy.OnPush,
++})
++export class Summary {
++  private readonly formApi = inject(ApplicantFormApi);
++  private readonly planApi = inject(PlanListApi);
++  private readonly context = inject(CountryContext);
++  private readonly store = inject(QuoteStore);
++  private readonly confirmations = inject(ConfirmationStore);
++  private readonly router = inject(Router);
++  private readonly route = inject(ActivatedRoute);
++  private readonly clock = inject(CLOCK);
++  private readonly delayMs = inject(PAYMENT_DELAY_MS);
++  private readonly injector = inject(Injector);
++  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
++  private readonly gatewayHeading = viewChild<ElementRef<HTMLElement>>('gatewayHeading');
++  private readonly alert = viewChild<ElementRef<HTMLElement>>('alert');
++  private readonly payButton = viewChild<ElementRef<HTMLElement>>('payButton');
++
++  protected readonly fallback = FALLBACK_COPY;
++  protected readonly country = this.context.current;
++  protected readonly state = signal<PaymentState>('idle');
++  /** GAP-18: memory only; a new component instance (every visit) starts unchecked. */
++  protected readonly accepted = signal(false);
++
++  /** Fields and plans are fetched on every entry (GAP-15); nothing is cached here. */
++  protected readonly resource = rxResource({
++    params: () => this.country() ?? undefined,
++    stream: ({ params }) =>
++      forkJoin({
++        fields: this.formApi.fields(params.code),
++        plans: this.planApi.plans(params.code, params.currency),
++      }),
++  });
++
++  private readonly data = computed(() => (this.resource.hasValue() ? this.resource.value() : null));
++
++  private readonly selectedPlan = computed(() => {
++    const id = this.store.planDocumentId();
++    return this.data()?.plans.find((p) => p.documentId === id) ?? null;
++  });
++
++  protected readonly planUnavailable = computed(
++    () => this.data() !== null && this.selectedPlan() === null && this.state() !== 'approved',
++  );
++
++  private readonly formatter = computed(() => {
++    const c = this.country();
++    return c
++      ? new Intl.NumberFormat(c.numberLocale, {
++          style: 'currency',
++          currency: c.currency,
++          minimumFractionDigits: 0,
++          maximumFractionDigits: 0,
++        })
++      : null;
++  });
++
++  protected readonly view = computed(() => {
++    const data = this.data();
++    const country = this.country();
++    const plan = this.selectedPlan();
++    if (!data || !country || !plan) {
++      return null;
++    }
++    const yearKey = data.fields.find((f) => f.validations.some((v) => v.type === 'vehicleYear'))?.key;
++    const year = yearKey ? this.store.values()[yearKey] : null;
++    const finalPrice = computeFinalPrice(plan.basePrice, typeof year === 'number' ? year : null, this.clock());
++    const format = {
++      numberLocale: country.numberLocale,
++      yes: this.text('common.yes', ''),
++      no: this.text('common.no', ''),
++    };
++    const values = this.store.values();
++    return {
++      policyholder: buildRows(data.fields, values, 'policyholder', format),
++      vehicle: buildRows(data.fields, values, 'vehicle', format),
++      plan,
++      formattedPrice: this.formatter()?.format(finalPrice) ?? String(finalPrice),
++    };
++  });
++
++  protected readonly termsAvailable = computed(() => (this.country()?.termsBody ?? '').trim().length > 0);
++
++  protected readonly locked = computed(() => this.state() === 'processing');
++  protected readonly canPay = computed(
++    () =>
++      this.accepted() &&
++      this.termsAvailable() &&
++      (this.state() === 'idle' || this.state() === 'rejected') &&
++      this.view() !== null,
++  );
++
++  private timer: ReturnType<typeof setTimeout> | null = null;
++  private headingFocused = false;
++
++  constructor() {
++    inject(DestroyRef).onDestroy(() => this.cancelTimer());
++    effect(() => {
++      const heading = this.heading();
++      if (heading && this.data() && !this.headingFocused) {
++        this.headingFocused = true;
++        afterNextRender(() => heading.nativeElement.focus(), { injector: this.injector });
++      }
++    });
++  }
++
++  protected text(key: string, fallback: string): string {
++    const value = this.country()?.copy[key];
++    if (value === undefined) {
++      console.warn(`Missing copy key: ${key}`);
++      return fallback;
++    }
++    return value;
++  }
++
++  protected setAccepted(event: Event): void {
++    if (!this.locked()) {
++      this.accepted.set((event.target as HTMLInputElement).checked);
++    }
++  }
++
++  protected openGateway(): void {
++    if (!this.canPay()) {
++      return;
++    }
++    this.state.set('gateway');
++    this.focusLater(this.gatewayHeading);
++  }
++
++  protected cancel(): void {
++    if (this.state() !== 'gateway') {
++      return;
++    }
++    this.state.set('idle');
++    this.focusLater(this.payButton);
++  }
++
++  /** SPEC-US-03 section 5 "Single submit": only accepted from `gateway`. */
++  protected simulate(outcome: 'approved' | 'rejected'): void {
++    if (this.state() !== 'gateway') {
++      return;
++    }
++    this.state.set('processing');
++    this.timer = setTimeout(() => {
++      this.timer = null;
++      if (outcome === 'approved') {
++        void this.approve();
++      } else {
++        this.state.set('rejected');
++        this.focusLater(this.alert);
++      }
++    }, this.delayMs);
++  }
++
++  private async approve(): Promise<void> {
++    const country = this.country();
++    const view = this.view();
++    if (!country || !view) {
++      this.state.set('idle');
++      return;
++    }
++    this.state.set('approved');
++    this.confirmations.set({
++      countryCode: country.code,
++      quoteNumber: generateQuoteNumber(country.code, this.clock()),
++      planName: view.plan.name,
++      formattedPrice: view.formattedPrice,
++    });
++    await this.router.navigate(['/', country.code.toLowerCase(), 'confirmacion']);
++    this.store.clear();
++  }
++
++  protected editData(): void {
++    this.go('datos');
++  }
++
++  protected changePlan(): void {
++    this.go('planes');
++  }
++
++  private go(step: string): void {
++    const code = this.country()?.code.toLowerCase();
++    if (code && !this.locked()) {
++      void this.router.navigate(['/', code, step]);
++    }
++  }
++
++  private cancelTimer(): void {
++    if (this.timer !== null) {
++      clearTimeout(this.timer);
++      this.timer = null;
++    }
++  }
++
++  private focusLater(target: () => ElementRef<HTMLElement> | undefined): void {
++    afterNextRender(() => target()?.nativeElement.focus(), { injector: this.injector });
++  }
++
++  protected retry(): void {
++    this.headingFocused = false;
++    if (this.country()) {
++      this.resource.reload();
++      return;
++    }
++    const code = this.route.parent?.snapshot.paramMap.get('country')?.toUpperCase();
++    if (code) {
++      void this.resolveAfterError(code);
++    }
++  }
++
++  private async resolveAfterError(code: string): Promise<void> {
++    const outcome = await resolveAndActivate(this.context, this.store, code);
++    if (outcome !== 'error') {
++      await this.router.navigateByUrl(this.router.url, { onSameUrlNavigation: 'reload' });
++    }
++  }
++}
