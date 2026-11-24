@@ -1,0 +1,481 @@
+# US-03 re-review input (r2, fix commits only)  base=4d4731dab756645d8bf33df4ac6a2a93b5b20a6c head=1dbaf06df6851cf27f482ef67399f35ec7b080ff
+## Commits
+1dbaf06 docs(US-03): record HC4 sign-off, accepted risks and manual checks
+a2e91a5 docs(US-03): list P2 criteria pending manual check in README
+7e901b4 docs(US-03): record F10 decision and resolution commit
+dc2e46e fix(US-03): keep focus on terms checkbox when closing gateway (REVIEW-US-03-F10)
+0a940a1 docs(US-03): record resolution commits and log TW-BUG-02 as F10
+0fcb455 test(US-03): terms gating unit tests, stronger AC-01 row assertions, drop fixed BUG markers (REVIEW-US-03-F05)
+ebfc6df fix(US-03): repair per-country terms seed syntax (REVIEW-US-03-F04)
+59fd7d0 fix(US-03): distinct CO and CL terms text in seed (REVIEW-US-03-F04)
+d450e35 fix(US-03): clear quote before navigating to confirmation (REVIEW-US-03-F03)
+7282b88 fix(US-03): block approval when terms are not accepted (REVIEW-US-03-F02)
+8dbbe7e chore(flow): add async-guard inject() check to reviewer and skill
+0e598a7 fix(US-03): inject summary guard deps before await (REVIEW-US-03-F01)
+## Commit Refs lines
+1dbaf06 Refs: SPEC-US-03, REVIEW-US-03-F06, REVIEW-US-03-F07, REVIEW-US-03-F08
+a2e91a5 Refs: SPEC-US-03
+7e901b4 Refs: SPEC-US-03, REVIEW-US-03-F10
+dc2e46e Refs: SPEC-US-03, REVIEW-US-03-F10
+0a940a1 Refs: SPEC-US-03, REVIEW-US-03-F10
+0fcb455 Refs: SPEC-US-03, REVIEW-US-03-F05
+ebfc6df Refs: SPEC-US-03, REVIEW-US-03-F04
+59fd7d0 Refs: SPEC-US-03, REVIEW-US-03-F04
+d450e35 Refs: SPEC-US-03, REVIEW-US-03-F03, ADR-004
+7282b88 Refs: SPEC-US-03, REVIEW-US-03-F02
+8dbbe7e Refs: REVIEW-US-03-F01
+0e598a7 Refs: SPEC-US-03, REVIEW-US-03-F01
+## Changed files
+M	.claude/agents/reviewer.md
+M	.claude/skills/angular-conventions/SKILL.md
+M	FLOW.md
+M	README.md
+M	cms/src/bootstrap/seed-data.ts
+M	docs/reviews/REVIEW-US-03.md
+M	frontend/e2e/full-flow-keyboard.spec.ts
+M	frontend/e2e/us-03-summary-payment.spec.ts
+M	frontend/src/app/features/plan-list/plans-guard.ts
+M	frontend/src/app/features/summary/summary-guard.spec.ts
+M	frontend/src/app/features/summary/summary-guard.ts
+M	frontend/src/app/features/summary/summary.html
+M	frontend/src/app/features/summary/summary.spec.ts
+M	frontend/src/app/features/summary/summary.ts
+## Diff
+diff --git a/.claude/agents/reviewer.md b/.claude/agents/reviewer.md
+index fb7f1ac..0f9a24d 100644
+--- a/.claude/agents/reviewer.md
++++ b/.claude/agents/reviewer.md
+@@ -32,6 +32,7 @@ You are the independent code reviewer. You find real problems and explain them p
+    5. **Accessibility:** labels, `aria-describedby` for errors, focus management between steps, keyboard-only completion, contrast hints.
+    6. **Robustness:** loading, empty and error states, Strapi unavailable, invalid config from CMS, double submit.
+    7. **Code quality:** angular-conventions adherence, typing (`any`), dead code, duplication.
++      - **Guards/resolvers: `inject()` before any `await`.** In every functional guard or resolver in the diff, every `inject()` call (direct, or inside a helper it calls) must come before the first `await`/`.then`. One placed after it throws NG0203 at runtime, and only on the code path that crosses the `await`. Check that a unit test runs that path (see the async-guard test pattern in the `angular-conventions` skill §8). Report a violation as `blocker` (added after REVIEW-US-03-F01).
+    8. **Process:** commits follow conventions, the branch matches the spec gate rule (no feature code from `chore/scaffold-*`), and the spec `version` the code was built against is the current approved one.
+ 3. **Log every bug reported by the test-writer as a finding**, one finding per bug, with source `test-writer`. Use the reported AC, symptom and failing test as evidence, and add your own `file:line` analysis of the cause. Do this even if you think the bug is minor or the test is wrong: in that case say so in the recommendation, and the human decides at HC3. Never drop a reported bug.
+ 4. Write each finding with an ID `REVIEW-US-XX-FNN`, source (`review` | `test-writer`), severity (`blocker` | `major` | `minor` | `nit`), `file:line`, what is wrong (with evidence), and a concrete recommendation. Leave "Human decision", "Resolution commit" and "Status" empty or `Open`.
+diff --git a/.claude/skills/angular-conventions/SKILL.md b/.claude/skills/angular-conventions/SKILL.md
+index f256546..8dcd740 100644
+--- a/.claude/skills/angular-conventions/SKILL.md
++++ b/.claude/skills/angular-conventions/SKILL.md
+@@ -89,6 +89,21 @@ frontend/e2e/  Playwright specs
+ - Unit tests run on **Vitest**, the Angular CLI default (`@angular/build:unit-test` builder) ([testing](https://angular.dev/guide/testing)). TestBed is zoneless by default.
+ - Test pure functions directly (mapper, validators, price rule, mask). Test components through the DOM with roles and labels. Mock HTTP with `provideHttpClientTesting`.
+ - E2E with Playwright against the seeded stack. Test names start with the AC ID.
++- **Async functional guards/resolvers need a unit test for every path that crosses an `await`.** The §6 rule (`inject()` before the first `await`) was in this skill and was still broken in US-03 (REVIEW-US-03-F01). The existing tests never ran the guard, and the early-return path doesn't reach the `await`, so a guard can look fine and still throw NG0203 for real users. Pattern:
++  ```ts
++  // Run the guard exactly as the router does: inside an injection context, then await the result.
++  const run = (url: string) =>
++    TestBed.runInInjectionContext(() =>
++      summaryGuard(routeFor(url), { url } as RouterStateSnapshot),
++    ) as Promise<GuardResult>;
++
++  it('US-03-AC-11 allows entry when step 1 is valid and a plan is selected', async () => {
++    seedStore({ values: validStep1, planDocumentId: 'p1' }); // state that makes the guard go past its first await
++    httpMock(...);                                             // let the awaited fetch resolve
++    expect(await run('/co/resumen')).toBe(true);               // NG0203 would reject here
++  });
++  ```
++  Cover at least: (1) the early-redirect path, (2) every path that continues after the `await` (allow and each redirect). Assert the returned `UrlTree` with `router.serializeUrl(result)`. A guard that composes another guard (`await otherGuard(...)`) must take its dependencies up front; prefer extracting the shared check into a plain async function that receives them as arguments.
+ 
+ ## 9. Accessibility checklist (every step)
+ 
+diff --git a/FLOW.md b/FLOW.md
+index 5fc1439..433dd28 100644
+--- a/FLOW.md
++++ b/FLOW.md
+@@ -113,6 +113,7 @@ TODO
+ - **Finding 2 (security): drafts are readable with `?status=draft` (2026-11-23, Phase 2).** Strapi 5.63 honors `status=draft` for anonymous `find`, so the Public role can read unpublished entries. Draft & Publish hides drafts from the app's queries, not from a direct caller. ADR-003 did not anticipate this. **Human decision (Andres Beltran):** accepted as a known risk for now (low impact: unpublished business content, no personal data), recorded in README "Known risks". **Proposed fix, if time remains:** a global Strapi middleware that forces `status=published` on unauthenticated `/api` requests, plus a test.
+ - **Skills corrected from verified facts (Phase 2).** Implementers reported where the `strapi5-content-modeling` and `angular-conventions` skills were unverified or wrong (permission model, 403 vs 405, strict params, `rxResource` for timeouts, `inject()` before `await` in guards). The main session updated the skills so later stories start from verified facts.
+ - **Windows host issues (Phase 2).** Docker Compose 5.6 bake failed on drive-letter case (`BUILDX_BAKE_ENTITLEMENTS_FS=0` workaround, in README troubleshooting), and CRLF checkouts broke the cms entrypoint (`.gitattributes` with `*.sh eol=lf`).
++- **A rule in a skill did not prevent the bug it describes (2026-11-23, US-03).** Since Phase 2 the `angular-conventions` skill said "in async functional guards, call every `inject()` before the first `await`". The US-03 implementer still wrote `summaryGuard` with `inject()` after `await plansGuard(...)`. It compiled, the build and the existing 95 unit tests passed, and none of them ran the guard. At runtime every user with a valid step 1 hit NG0203, so the summary page could not be reached and US-02's "Continuar" broke too. The test-writer's new guard unit tests and the e2e suite caught it (TW-BUG-01, [REVIEW-US-03-F01](docs/reviews/REVIEW-US-03.md), blocker). **Lesson:** guidance the agent reads while writing code is not enough for a rule whose violation is invisible until runtime. It needs a check at a later step that doesn't depend on the author remembering it. **Adjustment (Andres Beltran, HC3):** (1) an explicit item in the reviewer's checklist (`.claude/agents/reviewer.md`, step 2.7: "guards/resolvers: `inject()` before any `await`", reported as blocker); (2) a unit-test pattern for async guards in the `angular-conventions` skill §8 that runs the guard in `TestBed.runInInjectionContext` and covers every path that crosses the `await`.
+ 
+ TODO (remaining items at project end)
+ 
+diff --git a/README.md b/README.md
+index b2b3ff2..1c5eac5 100644
+--- a/README.md
++++ b/README.md
+@@ -79,6 +79,8 @@ TODO: Public role permissions and their justification; no tokens in the browser.
+ | Missing Strapi copy for `form.title`, `form.intro`, `form.empty` or `common.continue` renders empty text, and the missing-key warning is logged on every change-detection pass (REVIEW-US-01-F09). | Low: the seed defines all keys; affects only misconfigured content. | Accepted (Andres Beltran, 2026-11-23, HC3 US-01). | Technical fallbacks for those keys; warn once per key. |
+ | Plan prices are recomputed in the template on every change-detection pass; when the vehicle year is unavailable, the factor-1 warning (and any missing-copy warning) is logged repeatedly (REVIEW-US-02-F03). | Low: console noise only; prices are correct. | Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Compute priced plans once in a `computed`; warn once. |
+ | The plans step fetches `/form-fields` twice (guard + component), and if only `/form-fields` fails the whole plan list shows the error state instead of falling back to factor 1.00 (REVIEW-US-02-F04). | Low: rare failure case; "Reintentar" recovers. | Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Cache form fields per country and map a fields failure to "no vehicle year". |
++| When Strapi is unreachable, `/{cc}/confirmacion` renders an empty page (no heading, error or retry) instead of redirecting to step 1 (REVIEW-US-03-F06). | Low: Strapi-down only; no confirmation can exist in that state. | Accepted (Andres Beltran, 2026-11-23, HC3 US-03). | When the country is null, redirect to `/{route param}/datos`. |
++| The summary and confirmation duplicate the copy lookup instead of the shared `copy()` helper, so a missing copy key is logged on every change-detection pass (REVIEW-US-03-F08). The unused `StepPlaceholder` and a stale routes comment remain (REVIEW-US-03-F07). | Low: cosmetic, no user impact. | Accepted (Andres Beltran, 2026-11-23, HC3 US-03). | Use `copy()`; delete `step-placeholder.ts`. |
+ 
+ ## Manual checks (P2 without automated test)
+ 
+@@ -94,6 +96,14 @@ TODO: Public role permissions and their justification; no tokens in the browser.
+ | US-02-AC-11 (selection kept on return and reload) | Pending manual check. |
+ | US-02-AC-20 (focus on arrival) | Pending manual check. |
+ | US-02-AC-21 (responsive layout) | Pending manual check. |
++| US-03-AC-13 (summary error state with retry when Strapi fails) | Pending manual check. Implemented. |
++| US-03-AC-15 (selected plan no longer available shows "Cambiar plan") | Pending manual check. Implemented. |
++| US-03-AC-16 (option labels, locale dates, empty optional fields omitted) | Pending manual check. Implemented. |
++| US-03-AC-17 (terms acceptance resets on re-entry) | Pending manual check. Implemented. |
++| US-03-AC-18 (confirmation without data redirects to step 1) | Pending manual check. Implemented. When Strapi is down, the confirmation page renders empty (REVIEW-US-03-F06, accepted risk). |
++| US-03-AC-19 (cancel closes the gateway and returns focus) | Pending manual check. Implemented. |
++| US-03-AC-20 (payment with keyboard only) | Automated for CO: `US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only`. CL verified manually at HC4 (full keyboard-only flow in Chile), Andres Beltran, 2026-11-23. |
++| US-03-AC-21 (summary fits a 360px viewport) | Pending manual check. |
+ 
+ ## Requirements not met
+ 
+diff --git a/cms/src/bootstrap/seed-data.ts b/cms/src/bootstrap/seed-data.ts
+index 447bc02..ca59fc6 100644
+--- a/cms/src/bootstrap/seed-data.ts
++++ b/cms/src/bootstrap/seed-data.ts
+@@ -253,19 +253,22 @@ const buildPlans = (s: PlanSet): SeedPlan[] => {
+   ];
+ };
+ 
+-const TERMS =
+-  '1. Este es un texto de ejemplo.\n2. La cotización es simulada y no constituye una póliza.\n3. No se realiza ningún cobro real.';
++const TERMS_CO =
++  '1. Este es un texto de ejemplo para Colombia.\n2. Supervisión: Superintendencia Financiera de Colombia (texto de ejemplo).\n3. La cotización es simulada y no constituye una póliza.\n4. No se realiza ningún cobro real.';
++
++const TERMS_CL =
++  '1. Este es un texto de ejemplo para Chile.\n2. Supervisión: Comisión para el Mercado Financiero (texto de ejemplo).\n3. La cotización es simulada y no constituye una póliza.\n4. No se realiza ningún cobro real.';
+ 
+ export const COUNTRIES: SeedCountry[] = [
+   {
+     code: 'CO', name: 'Colombia', numberLocale: 'es-CO', currency: 'COP', legalAge: 18,
+-    termsTitle: 'Términos y condiciones – Colombia', termsBody: TERMS,
++    termsTitle: 'Términos y condiciones – Colombia', termsBody: TERMS_CO,
+     fields: CO_FIELDS,
+     plans: buildPlans({ names: ['Plan Básico', 'Plan Estándar', 'Plan Premium'], prices: [850000, 1250000, 1900000], coverages: ['Responsabilidad civil', 'Pérdida total por daños', 'Hurto'], benefits: ['Grúa 24/7', 'Vehículo de reemplazo'] }),
+   },
+   {
+     code: 'CL', name: 'Chile', numberLocale: 'es-CL', currency: 'CLP', legalAge: 18,
+-    termsTitle: 'Términos y condiciones – Chile', termsBody: TERMS,
++    termsTitle: 'Términos y condiciones – Chile', termsBody: TERMS_CL,
+     fields: CL_FIELDS,
+     plans: buildPlans({ names: ['Plan Esencial', 'Plan Full', 'Plan Full Plus'], prices: [259990, 389990, 549990], coverages: ['Responsabilidad civil', 'Daños propios', 'Robo'], benefits: ['Asistencia en ruta', 'Auto de reemplazo'] }),
+   },
+diff --git a/docs/reviews/REVIEW-US-03.md b/docs/reviews/REVIEW-US-03.md
+index 02250bb..2797273 100644
+--- a/docs/reviews/REVIEW-US-03.md
++++ b/docs/reviews/REVIEW-US-03.md
+@@ -23,21 +23,23 @@ Status: `Open` · `Resolved` · `Accepted` · `Deferred`.
+ 
+ | ID | Source | Severity | File:line | Finding | Recommendation | Human decision | Resolution commit | Status |
+ |----|--------|----------|-----------|---------|----------------|----------------|-------------------|--------|
+-| REVIEW-US-03-F01 | test-writer | blocker | `frontend/src/app/features/summary/summary-guard.ts:9-15` | TW-BUG-01. Reported: the guard throws NG0203 "inject() must be called from an injection context"; navigation to `/{cc}/resumen` fails (lands on `/`), "Continuar" on plans does nothing. Failing: unit `US-03-AC-11 summary guard allows entry…` and `…redirects to planes…`; 21 e2e tests that need the summary (AC-01..08, 10, 12, keyboard full flow `US-01-AC-12 US-03-AC-20…`), e2e `US-03-AC-11 … (valid step 1, no plan)`, and 3 US-02 regressions (US-02-AC-03 co/cl, real step 1 form co). Reviewer analysis confirmed: line 9 does `await plansGuard(route, state)`, and lines 13-15 then call `inject(CountryContext)`, `inject(QuoteStore)`, `inject(Router)`. The injection context exists only for the synchronous part of a functional guard, so every path where step 1 is valid throws. The "no wizard state" case passes only because `plansGuard` returns before its own `await` (`plans-guard.ts:22-23`) and `summaryGuard` returns at line 11. `plansGuard` itself is correct: it injects everything first (`plans-guard.ts:12-16`). The `as GuardResult` cast at line 9 also hides that `CanActivateFn` may return an Observable, which `await` would not subscribe to. This blocks the P1 ACs AC-01..08, 10, 11 and 12, and US-02-AC-03. | Move all `inject()` calls (CountryContext, QuoteStore, Router) to the top of `summaryGuard`, before the `await`. Better: extract the step-1 check from `plansGuard` into a plain async function that takes its dependencies as arguments, and call it from both guards so no cast is needed. Re-run the 2 unit guard tests and the full US-02/US-03/full-flow e2e suites. | fix now | | Open |
+-| REVIEW-US-03-F02 | review | major | `frontend/src/app/features/summary/summary.html:90`, `frontend/src/app/features/summary/summary.ts:175-179` | You can complete a payment without accepting the terms. The checkbox is disabled only when `locked()` (state `processing`) or when terms are unavailable, so it stays enabled while the gateway is open (state `gateway`). `simulate()` checks only `state() === 'gateway'` and never re-checks `accepted()`. So: check terms → "Pagar" → uncheck terms → "Simular pago aprobado" gives an approved payment and a quote number with the box unchecked. This defeats the AC-02 / GAP-09 rule that payment is gated by acceptance (§5 "Pay enabled iff checkbox checked"). The spec text locks the checkbox only during processing (GAP-17), but this gap breaks the intent of the gating rule. | Pick one: (a) in `simulate()`, refuse unless `accepted() && termsAvailable()`; or (b) close the gateway (state → `idle`, focus to "Pagar") when the checkbox is unchecked; or (c) also disable the checkbox while state is `gateway`. Option (a) plus (b) keeps the state-level lock style of GAP-17. Add a unit test (e.g. under `US-03-AC-02`). If (c) changes visible behavior, check whether the spec needs a version bump. | fix now | | Open |
+-| REVIEW-US-03-F03 | review | minor | `frontend/src/app/features/summary/summary.ts:198-206` | ADR-004 "Clearing" (`docs/adr/ADR-004-wizard-state-in-browser.md:54`) requires removing `quote:v1:{CC}` **before** navigating to confirmation. `approve()` calls `store.clear()` only after `await this.router.navigate(...)`. The implementer flagged this as a deliberate choice, but it contradicts an accepted ADR. Concrete risks: if the navigation rejects or is cancelled (e.g. a lazy chunk load fails), `store.clear()` never runs, so the PII stays in sessionStorage while a confirmation already sits in `ConfirmationStore`. The summary is also left in state `approved` with no pay controls and no message. | Call `this.store.clear()` before `router.navigate(...)`. `planUnavailable` already excludes state `approved`, so nothing visible breaks. Handle a failed navigation (e.g. reset state, or navigate to `/{cc}/datos`). If the current order is preferred, have the architect amend ADR-004 (HC2) instead of diverging silently. | fix now (code must match Accepted ADR-004) | | Open |
+-| REVIEW-US-03-F04 | review | minor | `cms/src/bootstrap/seed-data.ts:256-268` | Country matrix (SPEC-US-03 §3) says the terms body differs per country: CO mentions "Superintendencia Financiera de Colombia (texto de ejemplo)" and CL mentions "Comisión para el Mercado Financiero (texto de ejemplo)". The seed uses one shared `TERMS` constant for both countries. So the per-country body in AC-02 is not shown in the seed, and the AC-02 e2e test (`us-03-summary-payment.spec.ts:130`) cannot catch a cross-country body mix-up: only the title differs. This file is outside the commit range but is the seed data that US-03 relies on. | Give CO and CL distinct fictitious `termsBody` texts as the matrix says. Seed changes go under `cms/` on this feat branch, which the gate allows because the spec is Approved. | fix now | | Open |
+-| REVIEW-US-03-F05 | review | minor | `frontend/e2e/us-03-summary-payment.spec.ts:91-112`; `frontend/src/app/features/summary/summary.spec.ts` | Test gaps and weak assertions: (1) the test mapping lists AC-02 as "e2e + unit", but there is no `US-03-AC-02` unit test (the test-writer confirmed this). (2) In the AC-01 e2e test, `draftOnlyField` (lines 111-112) is checked against the **Strapi API response**, not the page, so it is tautological for the UI. (3) AC-01 checks only that each row exists (`row-${key}` visible), not the Strapi label or the displayed value. AC-01 requires "every … field label and value". | Add a unit test `US-03-AC-02 terms from Strapi per country gate the pay button` (title/body from the mocked country; pay disabled/enabled with the checkbox). Assert that the page has no `row-draftOnlyField`, instead of checking the API. Assert each row's `dt` equals the API `label`, and for at least one non-masked field assert the `dd` value. | fix now | | Open |
++| REVIEW-US-03-F01 | test-writer | blocker | `frontend/src/app/features/summary/summary-guard.ts:9-15` | TW-BUG-01. Reported: the guard throws NG0203 "inject() must be called from an injection context"; navigation to `/{cc}/resumen` fails (lands on `/`), "Continuar" on plans does nothing. Failing: unit `US-03-AC-11 summary guard allows entry…` and `…redirects to planes…`; 21 e2e tests that need the summary (AC-01..08, 10, 12, keyboard full flow `US-01-AC-12 US-03-AC-20…`), e2e `US-03-AC-11 … (valid step 1, no plan)`, and 3 US-02 regressions (US-02-AC-03 co/cl, real step 1 form co). Reviewer analysis confirmed: line 9 does `await plansGuard(route, state)`, and lines 13-15 then call `inject(CountryContext)`, `inject(QuoteStore)`, `inject(Router)`. The injection context exists only for the synchronous part of a functional guard, so every path where step 1 is valid throws. The "no wizard state" case passes only because `plansGuard` returns before its own `await` (`plans-guard.ts:22-23`) and `summaryGuard` returns at line 11. `plansGuard` itself is correct: it injects everything first (`plans-guard.ts:12-16`). The `as GuardResult` cast at line 9 also hides that `CanActivateFn` may return an Observable, which `await` would not subscribe to. This blocks the P1 ACs AC-01..08, 10, 11 and 12, and US-02-AC-03. | Move all `inject()` calls (CountryContext, QuoteStore, Router) to the top of `summaryGuard`, before the `await`. Better: extract the step-1 check from `plansGuard` into a plain async function that takes its dependencies as arguments, and call it from both guards so no cast is needed. Re-run the 2 unit guard tests and the full US-02/US-03/full-flow e2e suites. | fix now | `0e598a7` | Resolved |
++| REVIEW-US-03-F02 | review | major | `frontend/src/app/features/summary/summary.html:90`, `frontend/src/app/features/summary/summary.ts:175-179` | You can complete a payment without accepting the terms. The checkbox is disabled only when `locked()` (state `processing`) or when terms are unavailable, so it stays enabled while the gateway is open (state `gateway`). `simulate()` checks only `state() === 'gateway'` and never re-checks `accepted()`. So: check terms → "Pagar" → uncheck terms → "Simular pago aprobado" gives an approved payment and a quote number with the box unchecked. This defeats the AC-02 / GAP-09 rule that payment is gated by acceptance (§5 "Pay enabled iff checkbox checked"). The spec text locks the checkbox only during processing (GAP-17), but this gap breaks the intent of the gating rule. | Pick one: (a) in `simulate()`, refuse unless `accepted() && termsAvailable()`; or (b) close the gateway (state → `idle`, focus to "Pagar") when the checkbox is unchecked; or (c) also disable the checkbox while state is `gateway`. Option (a) plus (b) keeps the state-level lock style of GAP-17. Add a unit test (e.g. under `US-03-AC-02`). If (c) changes visible behavior, check whether the spec needs a version bump. | fix now | `7282b88` | Resolved |
++| REVIEW-US-03-F03 | review | minor | `frontend/src/app/features/summary/summary.ts:198-206` | ADR-004 "Clearing" (`docs/adr/ADR-004-wizard-state-in-browser.md:54`) requires removing `quote:v1:{CC}` **before** navigating to confirmation. `approve()` calls `store.clear()` only after `await this.router.navigate(...)`. The implementer flagged this as a deliberate choice, but it contradicts an accepted ADR. Concrete risks: if the navigation rejects or is cancelled (e.g. a lazy chunk load fails), `store.clear()` never runs, so the PII stays in sessionStorage while a confirmation already sits in `ConfirmationStore`. The summary is also left in state `approved` with no pay controls and no message. | Call `this.store.clear()` before `router.navigate(...)`. `planUnavailable` already excludes state `approved`, so nothing visible breaks. Handle a failed navigation (e.g. reset state, or navigate to `/{cc}/datos`). If the current order is preferred, have the architect amend ADR-004 (HC2) instead of diverging silently. | fix now (code must match Accepted ADR-004) | `d450e35` | Resolved |
++| REVIEW-US-03-F04 | review | minor | `cms/src/bootstrap/seed-data.ts:256-268` | Country matrix (SPEC-US-03 §3) says the terms body differs per country: CO mentions "Superintendencia Financiera de Colombia (texto de ejemplo)" and CL mentions "Comisión para el Mercado Financiero (texto de ejemplo)". The seed uses one shared `TERMS` constant for both countries. So the per-country body in AC-02 is not shown in the seed, and the AC-02 e2e test (`us-03-summary-payment.spec.ts:130`) cannot catch a cross-country body mix-up: only the title differs. This file is outside the commit range but is the seed data that US-03 relies on. | Give CO and CL distinct fictitious `termsBody` texts as the matrix says. Seed changes go under `cms/` on this feat branch, which the gate allows because the spec is Approved. | fix now | `59fd7d0`, `ebfc6df` | Resolved |
++| REVIEW-US-03-F05 | review | minor | `frontend/e2e/us-03-summary-payment.spec.ts:91-112`; `frontend/src/app/features/summary/summary.spec.ts` | Test gaps and weak assertions: (1) the test mapping lists AC-02 as "e2e + unit", but there is no `US-03-AC-02` unit test (the test-writer confirmed this). (2) In the AC-01 e2e test, `draftOnlyField` (lines 111-112) is checked against the **Strapi API response**, not the page, so it is tautological for the UI. (3) AC-01 checks only that each row exists (`row-${key}` visible), not the Strapi label or the displayed value. AC-01 requires "every … field label and value". | Add a unit test `US-03-AC-02 terms from Strapi per country gate the pay button` (title/body from the mocked country; pay disabled/enabled with the checkbox). Assert that the page has no `row-draftOnlyField`, instead of checking the API. Assert each row's `dt` equals the API `label`, and for at least one non-masked field assert the `dd` value. | fix now | `0fcb455` | Resolved |
+ | REVIEW-US-03-F06 | review | minor | `frontend/src/app/features/confirmation/confirmation-guard.ts:10-11`, `frontend/src/app/features/confirmation/confirmation.ts:12-24` | When the country cannot be resolved (Strapi unreachable), `confirmationGuard` returns `true` and the Confirmation component renders an empty `<section>`: no h1, no error, no retry. GAP-04 makes loading/error states with retry mandatory, and GAP-22 says a deep link to `/{cc}/confirmacion` without data redirects to `/{cc}/datos`. In this state there can never be a confirmation in memory for the country. | When `country` is null, redirect to `/{route param}/datos` (lowercase `:country` param from the route snapshot), where step 1 already shows its technical error and retry. | accept risk: P2 case (AC-18), only when Strapi is down | | Accepted |
+ | REVIEW-US-03-F07 | review | nit | `frontend/src/app/shared/step-placeholder.ts:1-14`, `frontend/src/app/app.routes.ts:7`, `frontend/e2e/full-flow-keyboard.spec.ts:76-77,85` | Dead code and leftovers: `StepPlaceholder` is no longer referenced by any route. The routes comment "Step components are placeholders until the features replace them" is now stale. In the keyboard e2e, `chosenName` is computed and then discarded with `void chosenName`. The "Continuar" `tabTo` predicate has a redundant cast and duplicate conditions. | Delete `step-placeholder.ts` and update the routes comment. In the e2e, either assert `chosenName` on the summary (`summary-plan-name`) or remove it, and simplify the predicate to `button('Continuar')`. | accept risk: cosmetic | | Accepted |
+ | REVIEW-US-03-F08 | review | nit | `frontend/src/app/features/summary/summary.ts:143-150`, `frontend/src/app/features/confirmation/confirmation.ts:39-46` | Both components re-implement copy lookup instead of using the shared `copy()` helper (`frontend/src/app/core/country-config.ts:57`), the same pattern as `PlanList`. Because `text()` is called from the template and from the `view` computed, a missing key logs `console.warn` on every change detection. No PII is logged (keys only). | Use `copy(this.country(), key, fallback)`, or put a single `text()` on a shared base/helper. Optionally warn once per key. | accept risk: cosmetic, no user impact | | Accepted |
+-| REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/summary/summary.html:77,79` | The terms `<section aria-labelledby="terms-title">` and the inner `<div role="region" aria-labelledby="terms-title">` both form region landmarks with the same accessible name, so screen readers announce two "Términos y condiciones – …" regions. §7 requires the region only on the scrollable body. | Drop `aria-labelledby` from the outer `<section>`, or make it a plain `<div>`, and keep the region on the scrollable body. | fix now (overrides proposal: accessibility is an explicit requirement and the change is trivial; consistent with US-01 F04 and US-02 F02) | | Open |
++| REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/summary/summary.html:77,79` | The terms `<section aria-labelledby="terms-title">` and the inner `<div role="region" aria-labelledby="terms-title">` both form region landmarks with the same accessible name, so screen readers announce two "Términos y condiciones – …" regions. §7 requires the region only on the scrollable body. | Drop `aria-labelledby` from the outer `<section>`, or make it a plain `<div>`, and keep the region on the scrollable body. | fix now (overrides proposal: accessibility is an explicit requirement and the change is trivial; consistent with US-01 F04 and US-02 F02) | `d450e35` (shared with F03) | Resolved |
++| REVIEW-US-03-F10 | test-writer | minor | `frontend/src/app/features/summary/summary.ts:158` | TW-BUG-02, found in the fix round as a follow-up to F02. Logged by the main session because this cycle has only one review round. The unit test `US-03-AC-02 unchecking terms while the gateway is open blocks approval` fails. After the user unchecks terms with the gateway open, the gateway closes and approval is blocked, but `document.activeElement` is `<body>` instead of "Pagar". The handler calls `focusLater(this.payButton)` while "Pagar" is disabled, and `focus()` on a disabled button does nothing. Keyboard and screen-reader users lose their place. | Don't move focus to the disabled "Pagar". Keep focus on the terms checkbox, which the user just operated and which is the only enabled next step. Update the F02 unit test's focus assertion to match. | fix now (one-line accessibility fix, consistent with F09) | `dc2e46e` | Resolved |
+ 
+ ## Test-writer bugs
+ 
+ | Bug (as reported in the test run summary) | AC | Failing test | Finding ID |
+ |-------------------------------------------|----|--------------|------------|
+ | TW-BUG-01: `summaryGuard` calls `inject()` after `await plansGuard(...)` → NG0203; `/{cc}/resumen` unreachable (lands on `/`), "Continuar" on plans does nothing | US-03-AC-01..08, 10, 11 (no-plan case), 12, 20; US-02-AC-03 | `US-03-AC-11 summary guard allows entry when step 1 is valid and a plan is selected`, `US-03-AC-11 summary guard redirects to planes when step 1 is valid and no plan is selected` (unit); 22 e2e incl. `US-03-AC-11 … (valid step 1, no plan)`, `US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only`, US-02-AC-03 co/cl | REVIEW-US-03-F01 |
++| TW-BUG-02 (fix round): after the user unchecks terms while the gateway is open, focus lands on `<body>` because `focus()` is called on the disabled "Pagar" | US-03-AC-02 | `US-03-AC-02 unchecking terms while the gateway is open blocks approval` (unit) | REVIEW-US-03-F10 |
+ 
+ ## Spec conformance
+ 
+diff --git a/frontend/e2e/full-flow-keyboard.spec.ts b/frontend/e2e/full-flow-keyboard.spec.ts
+index 3122bc4..93998da 100644
+--- a/frontend/e2e/full-flow-keyboard.spec.ts
++++ b/frontend/e2e/full-flow-keyboard.spec.ts
+@@ -25,7 +25,6 @@ async function tabTo(page: Page, label: string, match: (a: Awaited<ReturnType<ty
+ 
+ const button = (text: string) => (a: Awaited<ReturnType<typeof activeInfo>>) => a.tag === 'BUTTON' && a.text === text;
+ 
+-// BUG: TW-BUG-01 (summary guard breaks step 2 -> step 3)
+ test('US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only', async ({ page }) => {
+   const year = String(new Date().getFullYear() - 2);
+ 
+diff --git a/frontend/e2e/us-03-summary-payment.spec.ts b/frontend/e2e/us-03-summary-payment.spec.ts
+index 45ec26c..4c8454d 100644
+--- a/frontend/e2e/us-03-summary-payment.spec.ts
++++ b/frontend/e2e/us-03-summary-payment.spec.ts
+@@ -86,7 +86,6 @@ test.describe('US-03 summary and payment (e2e)', () => {
+   for (const cc of ['co', 'cl']) {
+     const CC = cc.toUpperCase();
+ 
+-    // BUG: TW-BUG-01 summaryGuard NG0203 blocks every summary entry with valid step 1
+     test(`US-03-AC-01 summary shows policyholder, vehicle and plan with final price (${cc})`, async ({ page, request }) => {
+       const plan = await planInfo(request, cc);
+       await seedState(page, cc, plan.documentId);
+@@ -101,15 +100,19 @@ test.describe('US-03 summary and payment (e2e)', () => {
+           `/api/form-fields?filters[country][code][$eq]=${CC}&pagination[pageSize]=100&populate[0]=options`,
+         )
+       ).json();
+-      const expectedKeys = (api.data as Array<{ key: string }>)
+-        .map((f) => f.key)
+-        .filter((k) => STEP1[cc][k] !== undefined && STEP1[cc][k] !== '');
+-      expect(expectedKeys.length).toBeGreaterThan(5);
+-      for (const key of expectedKeys) {
+-        await expect(page.getByTestId(`row-${key}`), `row for ${key}`).toBeVisible();
++      const expectedFields = (api.data as Array<{ key: string; label: string }>).filter(
++        (f) => STEP1[cc][f.key] !== undefined && STEP1[cc][f.key] !== '',
++      );
++      expect(expectedFields.length).toBeGreaterThan(5);
++      for (const f of expectedFields) {
++        const row = page.getByTestId(`row-${f.key}`);
++        await expect(row, `row for ${f.key}`).toBeVisible();
++        await expect(row.locator('dt'), `label for ${f.key}`).toHaveText(f.label.trim());
+       }
+-      const draft = (api.data as Array<{ key: string }>).find((f) => f.key === 'draftOnlyField');
+-      expect(draft).toBeUndefined();
++      // A non-masked field shows its entered value (firstName is plain text in both countries).
++      await expect(page.getByTestId('row-firstName').locator('dd')).toHaveText(String(STEP1[cc]['firstName']));
++      // Unpublished (draft) fields must not appear on the page.
++      await expect(page.getByTestId('row-draftOnlyField')).toHaveCount(0);
+ 
+       // Price: vehicle age 2 -> no surcharge, so final price equals the base price (SPEC-US-02 AC-05).
+       const price = page.getByTestId('summary-price');
+@@ -192,7 +195,6 @@ test.describe('US-03 summary and payment (e2e)', () => {
+     });
+   }
+ 
+-  // BUG: TW-BUG-01 (summary unreachable)
+   test('US-03-AC-08 double click produces a single payment', async ({ page, request }) => {
+     await openSummary(page, request, 'co');
+     await openGateway(page);
+@@ -202,7 +204,6 @@ test.describe('US-03 summary and payment (e2e)', () => {
+     await expect(page.getByTestId('quote-number')).toHaveText(/^COT-CO-\d{8}-[A-Z0-9]{6}$/);
+   });
+ 
+-  // BUG: TW-BUG-01 (summary unreachable)
+   test('US-03-AC-10 clears wizard state after approval', async ({ page, request }) => {
+     await openSummary(page, request, 'co');
+     await openGateway(page);
+@@ -221,14 +222,12 @@ test.describe('US-03 summary and payment (e2e)', () => {
+     await expect(page).toHaveURL(/\/cl\/datos$/);
+   });
+ 
+-  // BUG: TW-BUG-01 (guard throws NG0203; lands on / instead of /cl/planes)
+   test('US-03-AC-11 summary guard redirects to first incomplete step (valid step 1, no plan)', async ({ page }) => {
+     await seedState(page, 'cl', null);
+     await page.goto('/cl/resumen');
+     await expect(page).toHaveURL(/\/cl\/planes$/);
+   });
+ 
+-  // BUG: TW-BUG-01 (summary unreachable)
+   test('US-03-AC-12 gateway has no card inputs', async ({ page, request }) => {
+     await openSummary(page, request, 'co');
+     await openGateway(page);
+diff --git a/frontend/src/app/features/plan-list/plans-guard.ts b/frontend/src/app/features/plan-list/plans-guard.ts
+index 3eaaf62..c5f99fb 100644
+--- a/frontend/src/app/features/plan-list/plans-guard.ts
++++ b/frontend/src/app/features/plan-list/plans-guard.ts
+@@ -1,5 +1,5 @@
+ import { inject } from '@angular/core';
+-import { CanActivateFn, Router } from '@angular/router';
++import { CanActivateFn, Router, UrlTree } from '@angular/router';
+ import { firstValueFrom } from 'rxjs';
+ import { CLOCK } from '../../core/clock';
+ import { CountryContext } from '../../core/country-context';
+@@ -7,13 +7,28 @@ import { QuoteStore } from '../../core/quote-store';
+ import { ApplicantFormApi } from '../applicant-form/applicant-form-api';
+ import { isStep1Valid } from '../applicant-form/validators';
+ 
+-/** GAP-05: step 2 needs a valid step 1; otherwise redirect to `/{cc}/datos`. Validated with the form's own engine. */
+-export const plansGuard: CanActivateFn = async () => {
+-  const router = inject(Router);
+-  const country = inject(CountryContext).current();
+-  const store = inject(QuoteStore);
+-  const api = inject(ApplicantFormApi);
+-  const now = inject(CLOCK);
++export interface Step1Deps {
++  router: Router;
++  context: CountryContext;
++  store: QuoteStore;
++  api: ApplicantFormApi;
++  now: () => Date;
++}
++
++/** Injects the dependencies of the step-1 check; must run synchronously in the injection context. */
++export function injectStep1Deps(): Step1Deps {
++  return {
++    router: inject(Router),
++    context: inject(CountryContext),
++    store: inject(QuoteStore),
++    api: inject(ApplicantFormApi),
++    now: inject(CLOCK),
++  };
++}
++
++/** Returns `true` when step 1 is valid, otherwise a redirect to `/{cc}/datos`. Plain function: no inject(). */
++export async function checkStep1({ router, context, store, api, now }: Step1Deps): Promise<true | UrlTree> {
++  const country = context.current();
+   if (!country) {
+     return true; // the step shows its own technical error state
+   }
+@@ -31,4 +46,7 @@ export const plansGuard: CanActivateFn = async () => {
+   } catch {
+     return redirect;
+   }
+-};
++}
++
++/** GAP-05: step 2 needs a valid step 1; otherwise redirect to `/{cc}/datos`. Validated with the form's own engine. */
++export const plansGuard: CanActivateFn = () => checkStep1(injectStep1Deps());
+diff --git a/frontend/src/app/features/summary/summary-guard.spec.ts b/frontend/src/app/features/summary/summary-guard.spec.ts
+index 1477a1d..58a0eaa 100644
+--- a/frontend/src/app/features/summary/summary-guard.spec.ts
++++ b/frontend/src/app/features/summary/summary-guard.spec.ts
+@@ -48,13 +48,10 @@ describe('US-03 summary guard (unit)', () => {
+     TestBed.resetTestingModule();
+   });
+ 
+-  // BUG: summaryGuard calls inject() after `await plansGuard(...)`, outside the injection context (NG0203),
+-  // so the guard rejects whenever step 1 is valid. See TW-BUG-01.
+   it('US-03-AC-11 summary guard allows entry when step 1 is valid and a plan is selected', async () => {
+     await expect(run('plan-1')).resolves.toBe(true);
+   });
+ 
+-  // BUG: same cause as above (TW-BUG-01).
+   it('US-03-AC-11 summary guard redirects to planes when step 1 is valid and no plan is selected', async () => {
+     const result = await run(null);
+     expect(result).toBeInstanceOf(UrlTree);
+diff --git a/frontend/src/app/features/summary/summary-guard.ts b/frontend/src/app/features/summary/summary-guard.ts
+index bd09840..1704f8e 100644
+--- a/frontend/src/app/features/summary/summary-guard.ts
++++ b/frontend/src/app/features/summary/summary-guard.ts
+@@ -1,18 +1,16 @@
+-import { inject } from '@angular/core';
+-import { CanActivateFn, GuardResult, Router } from '@angular/router';
+-import { CountryContext } from '../../core/country-context';
+-import { QuoteStore } from '../../core/quote-store';
+-import { plansGuard } from '../plan-list/plans-guard';
++import { CanActivateFn } from '@angular/router';
++import { checkStep1, injectStep1Deps } from '../plan-list/plans-guard';
+ 
+-/** GAP-05: step 3 needs a valid step 1 (via plansGuard) and a selected plan, else redirect to the first incomplete step. */
+-export const summaryGuard: CanActivateFn = async (route, state) => {
+-  const result = (await plansGuard(route, state)) as GuardResult;
++/** GAP-05: step 3 needs a valid step 1 and a selected plan, else redirect to the first incomplete step. */
++export const summaryGuard: CanActivateFn = async () => {
++  const deps = injectStep1Deps(); // all inject() calls happen before the first await
++  const result = await checkStep1(deps);
+   if (result !== true) {
+     return result;
+   }
+-  const country = inject(CountryContext).current();
+-  if (country && inject(QuoteStore).planDocumentId() === null) {
+-    return inject(Router).createUrlTree(['/', country.code.toLowerCase(), 'planes']);
++  const country = deps.context.current();
++  if (country && deps.store.planDocumentId() === null) {
++    return deps.router.createUrlTree(['/', country.code.toLowerCase(), 'planes']);
+   }
+   return true;
+ };
+diff --git a/frontend/src/app/features/summary/summary.html b/frontend/src/app/features/summary/summary.html
+index 6cf203e..85e686b 100644
+--- a/frontend/src/app/features/summary/summary.html
++++ b/frontend/src/app/features/summary/summary.html
+@@ -74,10 +74,10 @@
+         </div>
+ 
+         @if (termsAvailable()) {
+-          <section class="terms" aria-labelledby="terms-title" data-testid="terms">
++          <div class="terms" data-testid="terms">
+             <h2 id="terms-title">{{ country()!.termsTitle }}</h2>
+             <div class="terms__body" role="region" aria-labelledby="terms-title" tabindex="0" data-testid="terms-body">{{ country()!.termsBody }}</div>
+-          </section>
++          </div>
+         } @else {
+           <p data-testid="terms-unavailable" role="alert">{{ text('summary.termsUnavailable', '') }}</p>
+         }
+diff --git a/frontend/src/app/features/summary/summary.spec.ts b/frontend/src/app/features/summary/summary.spec.ts
+index ae4fae4..27e7cf2 100644
+--- a/frontend/src/app/features/summary/summary.spec.ts
++++ b/frontend/src/app/features/summary/summary.spec.ts
+@@ -174,6 +174,38 @@ describe('US-03 summary (unit)', () => {
+     expect(set.mock.calls[0][0].quoteNumber).toMatch(/^COT-XX-20261123-[A-Z0-9]{6}$/);
+   });
+ 
++  it('US-03-AC-02 terms from Strapi per country gate the pay button', async () => {
++    const { fixture, el } = await setup(country({ termsTitle: 'T-XX', termsBody: 'BODY-XX' }));
++    expect(el.querySelector('[data-testid="terms"]')?.textContent).toContain('T-XX');
++    expect(el.querySelector('[data-testid="terms-body"]')?.textContent?.trim()).toBe('BODY-XX');
++    expect(button(el, 'PAY').disabled).toBe(true);
++    (el.querySelector('#terms-accept') as HTMLInputElement).click();
++    fixture.detectChanges();
++    expect(button(el, 'PAY').disabled).toBe(false);
++  });
++
++  it('US-03-AC-02 unchecking terms while the gateway is open blocks approval', async () => {
++    const { fixture, el, set } = await setup(country(), 0);
++    document.body.appendChild(el); // focus assertions need an attached element
++    const box = el.querySelector('#terms-accept') as HTMLInputElement;
++    box.click();
++    fixture.detectChanges();
++    button(el, 'PAY').click();
++    fixture.detectChanges();
++    expect(el.querySelector('[data-testid="gateway"]')).not.toBeNull();
++    box.focus(); // a synthetic click does not move focus; a real user click does
++    box.click();
++    fixture.detectChanges();
++    await fixture.whenStable();
++    fixture.detectChanges();
++    expect(box.checked).toBe(false);
++    expect(el.querySelector('[data-testid="gateway"]')).toBeNull();
++    expect(button(el, 'APPROVE')).toBeUndefined();
++    expect(button(el, 'PAY').disabled).toBe(true);
++    expect(document.activeElement).toBe(box);
++    expect(set).not.toHaveBeenCalled();
++  });
++
+   it('US-03-AC-14 missing terms disable payment', async () => {
+     const { el } = await setup(country({ termsBody: '' }));
+     expect(el.querySelector('[data-testid="terms-unavailable"]')?.textContent).toContain('NO-TERMS');
+diff --git a/frontend/src/app/features/summary/summary.ts b/frontend/src/app/features/summary/summary.ts
+index 18f6c68..b8b766e 100644
+--- a/frontend/src/app/features/summary/summary.ts
++++ b/frontend/src/app/features/summary/summary.ts
+@@ -150,8 +150,14 @@ export class Summary {
+   }
+ 
+   protected setAccepted(event: Event): void {
+-    if (!this.locked()) {
+-      this.accepted.set((event.target as HTMLInputElement).checked);
++    if (this.locked()) {
++      return;
++    }
++    const checked = (event.target as HTMLInputElement).checked;
++    this.accepted.set(checked);
++    if (!checked && this.state() === 'gateway') {
++      // Pagar is disabled now; focus stays on the terms checkbox the user just operated.
++      this.state.set('idle');
+     }
+   }
+ 
+@@ -173,7 +179,7 @@ export class Summary {
+ 
+   /** SPEC-US-03 section 5 "Single submit": only accepted from `gateway`. */
+   protected simulate(outcome: 'approved' | 'rejected'): void {
+-    if (this.state() !== 'gateway') {
++    if (this.state() !== 'gateway' || !this.accepted() || !this.termsAvailable()) {
+       return;
+     }
+     this.state.set('processing');
+@@ -202,8 +208,14 @@ export class Summary {
+       planName: view.plan.name,
+       formattedPrice: view.formattedPrice,
+     });
+-    await this.router.navigate(['/', country.code.toLowerCase(), 'confirmacion']);
++    const code = country.code.toLowerCase();
++    // ADR-004: clear the quote before navigating; state `approved` keeps the "plan unavailable" view hidden.
+     this.store.clear();
++    const navigated = await this.router.navigate(['/', code, 'confirmacion']);
++    if (!navigated) {
++      this.confirmations.clear();
++      await this.router.navigate(['/', code, 'datos']);
++    }
+   }
+ 
+   protected editData(): void {

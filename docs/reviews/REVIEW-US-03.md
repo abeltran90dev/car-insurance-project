@@ -82,4 +82,33 @@ Status: `Open` · `Resolved` · `Accepted` · `Deferred`.
   - **Robustness:** 10 s timeout inherited; loading/error/retry states; timer cancelled on destroy (GAP-23).
 - Process: the branch `feat/US-03-summary-payment` matches the gate rule, the spec is Approved v3, and ADR-001..004 are Accepted. The commit subjects follow Conventional Commits with the `US-03` scope. `Refs:` trailers could not be verified from the review input, which contains only `--oneline` subjects.
 - I ran no tests myself. All results come from the test-writer's summary.
-- Re-review after fixes: pending.
+- Re-review after fixes: done, see "Re-review r2" below.
+
+## Re-review r2 (2026-11-23)
+
+Input: [US-03-r2.diff](US-03-r2.diff), range `4d4731d..1dbaf06` (12 commits on `feat/US-03-summary-payment`, merged to `main` in `4f969ef`). The test results come from the test-writer's summary after `dc2e46e`: unit 111 passed / 0 failed, e2e 40 passed / 0 failed / 0 skipped. I did not run any tests.
+
+### Verification of fix-now findings
+
+| ID | Resolution commit | Proposed status | Reason |
+|----|-------------------|-----------------|--------|
+| REVIEW-US-03-F01 | `0e598a7` | Resolved | `summaryGuard` now calls `injectStep1Deps()` synchronously before `await checkStep1(deps)` (`summary-guard.ts:10-11`). `plansGuard` and `summaryGuard` share the plain `checkStep1` function (`plans-guard.ts:29-49`), and the `GuardResult` cast is gone. The `BUG` markers were removed from the 2 unit guard tests that run the paths after the `await`. The test-writer reports the tests green. |
+| REVIEW-US-03-F02 | `7282b88` | Resolved | `simulate()` now refuses unless `accepted() && termsAvailable()` (`summary.ts:182`). Unchecking while the gateway is open sets state `idle` (`summary.ts:158-161`), which is options (a)+(b). The unit test `US-03-AC-02 unchecking terms while the gateway is open blocks approval` checks that the gateway closes, "Pagar" is disabled and `set` is never called. |
+| REVIEW-US-03-F03 | `d450e35` | Resolved | `store.clear()` now runs before `router.navigate(...)` (`summary.ts:213-214`), as ADR-004 requires. There is also a fallback when navigation resolves `false`. One remaining gap in the error path is logged as new finding F11. |
+| REVIEW-US-03-F04 | `59fd7d0`, `ebfc6df` | Resolved | `TERMS_CO` and `TERMS_CL` are distinct and mention the Superintendencia Financiera de Colombia and the Comisión para el Mercado Financiero, as the matrix in SPEC-US-03 §3 says (`seed-data.ts:256-261`). The AC-02 e2e test compares `terms-body` with that country's API `termsBody` (`us-03-summary-payment.spec.ts:133`), so it would now catch a body shown for the wrong country. |
+| REVIEW-US-03-F05 | `0fcb455` | Resolved | (1) A unit test `US-03-AC-02 terms from Strapi per country gate the pay button` was added. (2) The draft field is now checked on the page with `row-draftOnlyField` and `toHaveCount(0)`, instead of in the API response. (3) Each row's `dt` must equal the Strapi `label`, and the `dd` value of `firstName` is checked. |
+| REVIEW-US-03-F09 | `d450e35` | Resolved | The outer element is now a plain `<div class="terms">` with no `aria-labelledby` (`summary.html:77`). The only region is the scrollable body. |
+| REVIEW-US-03-F10 | `dc2e46e` | Resolved | `setAccepted` no longer calls `focusLater(this.payButton)` on the disabled button, so focus stays on the checkbox (`summary.ts:158-161`). The unit test checks `document.activeElement === box`. |
+
+### New findings
+
+| ID | Source | Severity | File:line | Finding | Recommendation | Human decision | Resolution commit | Status |
+|----|--------|----------|-----------|---------|----------------|----------------|-------------------|--------|
+| REVIEW-US-03-F11 | review | minor | `frontend/src/app/features/summary/summary.ts:213-218`, `frontend/src/app/app.config.ts:11` | The fallback added for F03 covers only a navigation that resolves `false` (cancelled, or a guard said no). The router is set up with `provideRouter(routes, withComponentInputBinding())` and has no `withNavigationErrorHandler`/`resolveNavigationPromiseOnError`. So a `NavigationError` makes `router.navigate` **reject** instead of resolving `false`. A lazy chunk load failure, the very case F03 described, is a `NavigationError`. When it rejects, `confirmations.clear()` and the redirect to `/{cc}/datos` never run, and the rejection is unhandled (`void this.approve()` at `summary.ts:189`). The summary is also left blank: `store.clear()` has already set `selectedPlan`, and so `view()`, to null, and `planUnavailable` is suppressed in state `approved` (`summary.ts:78-80`). The user sees no controls, no message and no retry. There is still no PII leak, because the clear already happened. No unit test covers the fallback branch or the order "clear before navigate". | Wrap the navigation in `try/catch` and treat a rejection like `navigated === false`: clear the confirmation, then navigate to `/{cc}/datos`. If that also fails, set an error/idle state. Add unit tests with `Router.navigate` spied to (a) resolve `false` and (b) reject. Assert that `store.clear` was called before `navigate`, and that the confirmation is cleared. | not fixed, listed in README "Requirements not met / known risks" (Andres Beltran, HC-final, 2026-11-23: new r2 findings are listed, not fixed) | | Accepted |
+
+### Process note
+
+- **Branch rule:** met. All commits are on `feat/US-03-summary-payment`, SPEC-US-03 v3 is Approved, and ADR-001..004 are Accepted. The `cms/` change (seed) is allowed on this feat branch. `8dbbe7e chore(flow)` changes only `.claude/` files, which the gate does not cover, and this is the HC3-mandated process change.
+- **Refs trailers:** present on all 12 commits. Each fix commit references `SPEC-US-03` and its finding, and `d450e35` also references `ADR-004`. One small traceability gap: `d450e35` also resolves F09, but its subject and `Refs:` name only F03. The review table records the link ("shared with F03"), so no finding, but future multi-finding commits should list every finding they resolve. `8dbbe7e` has `Refs: REVIEW-US-03-F01` and no spec, which is fine for `chore(flow)`.
+- Commit subjects follow Conventional Commits with the `US-03` scope, one logical change each. F04 needed a follow-up syntax fix (`ebfc6df`), and both hashes are recorded.
+- The updated reviewer checklist item 2.7 (`inject()` before `await` in guards) was applied: `summaryGuard` and `plansGuard` are compliant, and the paths after the `await` are unit-tested.
