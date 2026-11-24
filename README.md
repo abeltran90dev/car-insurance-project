@@ -77,12 +77,23 @@ TODO: Public role permissions and their justification; no tokens in the browser.
 |------|--------|--------|--------------|
 | Anonymous `GET /api/<type>?status=draft` returns **draft** entries (verified on Strapi 5.63): any Public `find` permission honors the `status` parameter. The app never sends it, so drafts never reach the UI, but a direct caller can read unpublished content. | Low: unpublished business content (fields, plans), no personal data. | Accepted for now (Andres Beltran, 2026-11-23, Phase 2 checkpoint). Fixed if time remains. | A global Strapi middleware that forces `status=published` on unauthenticated `/api` requests, plus a test in `cms/tests/` proving `?status=draft` returns no drafts. |
 | Missing Strapi copy for `form.title`, `form.intro`, `form.empty` or `common.continue` renders empty text, and the missing-key warning is logged on every change-detection pass (REVIEW-US-01-F09). | Low: the seed defines all keys; affects only misconfigured content. | Accepted (Andres Beltran, 2026-11-23, HC3 US-01). | Technical fallbacks for those keys; warn once per key. |
+| Plan prices are recomputed in the template on every change-detection pass; when the vehicle year is unavailable, the factor-1 warning (and any missing-copy warning) is logged repeatedly (REVIEW-US-02-F03). | Low: console noise only; prices are correct. | Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Compute priced plans once in a `computed`; warn once. |
+| The plans step fetches `/form-fields` twice (guard + component), and if only `/form-fields` fails the whole plan list shows the error state instead of falling back to factor 1.00 (REVIEW-US-02-F04). | Low: rare failure case; "Reintentar" recovers. | Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Cache form fields per country and map a fields failure to "no vehicle year". |
 
 ## Manual checks (P2 without automated test)
 
 | AC | How verified |
 |----|--------------|
 | US-01-AC-21 (small screens, 320 px) | Manually at HC4 in CO and CL (Andres Beltran, 2026-11-23). |
+| US-02-AC-08 (single selection with keyboard) | Manually at HC4 (keyboard-only selection and continue), Andres Beltran, 2026-11-23. |
+| US-02-AC-13 (price recalculated after editing step 1) | Manually at HC4 (vehicle year changed, prices updated), Andres Beltran, 2026-11-23. |
+| US-02-AC-15 (error state with retry) | Manually at HC4 (CMS stopped, error shown, retry after restart loads plans), Andres Beltran, 2026-11-23. Unresolved-country retry also unit-tested (REVIEW-US-02-F01). |
+| US-02-AC-14 (loading state) | Pending manual check. Live-region behavior unit-tested (REVIEW-US-02-F02). |
+| US-02-AC-06 (price in country currency and format) | Pending manual check. |
+| US-02-AC-07 (only the first recommended plan is highlighted) | Pending manual check. At HC4 the recommended flag was moved to another plan in Strapi and the app reflected it after reload. |
+| US-02-AC-11 (selection kept on return and reload) | Pending manual check. |
+| US-02-AC-20 (focus on arrival) | Pending manual check. |
+| US-02-AC-21 (responsive layout) | Pending manual check. |
 
 ## Requirements not met
 
