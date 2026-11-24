@@ -74,10 +74,15 @@ export class ApplicantForm {
       return null;
     }
     const fields = this.fieldsResource.value();
+    let genericError = country.copy['form.genericError'];
+    if (!genericError) {
+      console.warn('Missing copy key: form.genericError');
+      genericError = FALLBACK_COPY.error;
+    }
     const ctx: ValidationContext = {
       legalAge: typeof country.legalAge === 'number' ? country.legalAge : null,
       now: this.clock,
-      genericError: country.copy['form.genericError'] ?? '',
+      genericError,
     };
     const stored = untracked(() => this.store.values());
     const controls: Record<string, FieldControl> = {};
@@ -119,13 +124,18 @@ export class ApplicantForm {
 
   /** The visible error for a field: shown after blur (touched) or after "Continuar". */
   protected errorFor(key: string): string | null {
-    this.revision();
-    const control = this.form()?.controls[key];
-    if (!control || !control.invalid || !(control.touched || this.submitted())) {
+    if (!this.isInvalidShown(key)) {
       return null;
     }
-    const failure = control.errors?.[RULE_ERROR] as ValidationFailure | undefined;
-    return failure?.message ?? null;
+    const failure = this.form()!.controls[key].errors?.[RULE_ERROR] as ValidationFailure | undefined;
+    return failure?.message || FALLBACK_COPY.error;
+  }
+
+  /** Whether the field is invalid and its error is due (touched or submitted); independent of message text. */
+  protected isInvalidShown(key: string): boolean {
+    this.revision();
+    const control = this.form()?.controls[key];
+    return !!control && control.invalid && (control.touched || this.submitted());
   }
 
   protected describedBy(field: FormFieldConfig): string | null {
@@ -133,7 +143,7 @@ export class ApplicantForm {
     if (field.helpText) {
       ids.push(`${this.id(field)}-help`);
     }
-    if (this.errorFor(field.key)) {
+    if (this.isInvalidShown(field.key)) {
       ids.push(`${this.id(field)}-error`);
     }
     return ids.length > 0 ? ids.join(' ') : null;

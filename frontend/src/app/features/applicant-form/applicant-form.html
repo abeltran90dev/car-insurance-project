@@ -19,6 +19,7 @@
     <p>{{ text('form.intro', '') }}</p>
     <form class="form" [formGroup]="group" (ngSubmit)="submit()" novalidate>
       @for (field of fields(); track field.key) {
+        @let invalid = isInvalidShown(field.key);
         @let error = errorFor(field.key);
         <div class="field" [class.field--checkbox]="field.type === 'checkbox'" [attr.data-field]="field.key">
           @switch (field.type) {
@@ -29,7 +30,7 @@
                 [formControl]="controlFor(field.key)"
                 [attr.required]="field.required ? '' : null"
                 [attr.aria-required]="field.required ? 'true' : null"
-                [attr.aria-invalid]="error ? 'true' : null"
+                [attr.aria-invalid]="invalid ? 'true' : null"
                 [attr.aria-describedby]="describedBy(field)"
               />
               <label [for]="id(field)">{{ field.label }}</label>
@@ -41,7 +42,7 @@
                 [formControl]="controlFor(field.key)"
                 [attr.required]="field.required ? '' : null"
                 [attr.aria-required]="field.required ? 'true' : null"
-                [attr.aria-invalid]="error ? 'true' : null"
+                [attr.aria-invalid]="invalid ? 'true' : null"
                 [attr.aria-describedby]="describedBy(field)"
               >
                 <option value="">{{ field.placeholder }}</option>
@@ -60,7 +61,7 @@
                 [attr.placeholder]="field.placeholder"
                 [attr.required]="field.required ? '' : null"
                 [attr.aria-required]="field.required ? 'true' : null"
-                [attr.aria-invalid]="error ? 'true' : null"
+                [attr.aria-invalid]="invalid ? 'true' : null"
                 [attr.aria-describedby]="describedBy(field)"
               />
             }
@@ -73,7 +74,7 @@
                 [attr.placeholder]="field.placeholder"
                 [attr.required]="field.required ? '' : null"
                 [attr.aria-required]="field.required ? 'true' : null"
-                [attr.aria-invalid]="error ? 'true' : null"
+                [attr.aria-invalid]="invalid ? 'true' : null"
                 [attr.aria-describedby]="describedBy(field)"
               />
             }
@@ -81,7 +82,7 @@
           @if (field.helpText) {
             <p class="field__help" [id]="id(field) + '-help'">{{ field.helpText }}</p>
           }
-          @if (error) {
+          @if (invalid) {
             <p class="field__error" [id]="id(field) + '-error'">{{ error }}</p>
           }
         </div>
