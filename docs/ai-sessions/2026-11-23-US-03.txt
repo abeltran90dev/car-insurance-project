@@ -1,0 +1,2262 @@
+
+> /clear
+
+> <ide_opened_file>The user opened the file
+  c:\Proyectos\car-insurance-project\docs\ai-sessions\2026-11-23-US-02.txt in
+  the IDE. This may or may not be related to the current
+  task.</ide_opened_file>
+
+> Read docs/prompts/story-cycle-prompt.md and run it for US-03. The full-flow
+  keyboard-only e2e for Colombia is part of this cycle; run it against
+  http://127.0.0.1:4200.
+
+● I'll start by reading the story-cycle prompt.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Spec Approved, ADRs Accepted, stack is up. Creating the branch.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Branch feat/US-03-summary-payment created from ec0e59a. Running the
+  implementer.
+
+● implementer(Implement US-03 P1 ACs)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● The implementer is now working on the P1 acceptance criteria for US-03. When
+  it finishes, I'll start the test-writer, which also writes the keyboard-only
+  Colombia e2e against http://127.0.0.1:4200.
+
+› Message from implementer
+  US-03 implementation is committed on `feat/US-03-summary-payment`,
+  implementing SPEC-US-03 v3 (Approved). `ng build` passes and the existing unit
+  suite passes (10 files, 95 tests). I did not run it against the Docker stack
+  or in a browser, and I did not run a lint step (I didn't check for a lint
+  script). No cms/ changes were needed. The seed already has `maskInSummary`
+  (true on the CO and CL document fields), `termsTitle` and `termsBody` for CO
+  and CL, and all step-3 copy keys. No rebuild or reset is needed on the Strapi
+  side. The frontend needs a rebuild to see the new routes.
+
+  **Commits**
+  - `a6f74b1` feat(US-03): add summary helpers (mask, quote number, row model)
+  - `1010f80` feat(US-03): summary and confirmation steps with simulated payment
+
+  Both end with the `Co-Authored-By: Claude Opus 5.5` line and a `Refs:`
+  trailer. The spec-gate hook never blocked a write.
+
+  **Files** (under `/c/Proyectos/car-insurance-project/frontend/src/app/`)
+  - `features/summary/`
+    - `summary.ts`, `summary.html`, `summary.css`
+    - `summary-guard.ts`
+    - `summary-model.ts` (`buildRows`)
+    - `mask.ts` (`maskDocument`)
+    - `quote-number.ts` (`generateQuoteNumber(code, now)`)
+    - `payment-settings.ts` (`PAYMENT_DELAY_MS`)
+    - `confirmation-store.ts`
+  - `features/confirmation/`
+    - `confirmation.ts`
+    - `confirmation-guard.ts`
+  - `app.routes.ts`: `resumen` and `confirmacion` now use the real components.
+  `shared/step-placeholder.ts` is now unused but left in place.
+
+  **ACs implemented**
+  - AC-01: `Summary` shows the policyholder and vehicle sections via
+  `buildRows`, with the plan name and the recalculated price
+  (`computeFinalPrice` and `Intl.NumberFormat`). Fields and plans are re-fetched
+  on every entry.
+  - AC-02: terms title and body come from the `country` entry and are rendered
+  in a scrollable region with `white-space: pre-line`. "Pagar" is disabled until
+  the checkbox is checked.
+  - AC-03 and AC-04: a simulated payment, covered by one flow.
+    - **Approve:** the controls lock, "Procesando pago…" shows, then it
+  navigates to `/{cc}/confirmacion`.
+    - **Reject:** it stays on the summary, shows the alert, keeps the checkbox
+  checked, and "Pagar" is enabled again.
+  - AC-05: `maskDocument` is applied to fields where `maskInSummary` is true.
+  Only the masked value is rendered, so the full value never appears in the DOM.
+  - AC-06 and AC-07: "Editar datos" goes to `/{cc}/datos` and "Cambiar plan"
+  goes to `/{cc}/planes`. The store is untouched, so data and the plan are kept.
+  - AC-08: `simulate()` only acts when the state is `gateway`.
+  - AC-09: the quote number is `COT-{CC}-{YYYYMMDD}-{6 chars}`, using the
+  injectable `CLOCK` and `crypto.getRandomValues`.
+  - AC-10: after navigating to the confirmation, `store.clear()` runs. Back to
+  `/resumen` then redirects to `/datos`.
+  - AC-11: `summaryGuard` reuses `plansGuard` (no or invalid step 1 goes to
+  `/{cc}/datos`), then redirects to `/{cc}/planes` if no plan is selected.
+  - AC-12: the gateway panel has only buttons, and nothing card-related is
+  stored.
+  - AC-14: with an empty `termsBody` it shows `summary.termsUnavailable`, and
+  the checkbox and "Pagar" are disabled.
+  - AC-22: backend only, already handled by the ADR-003 bootstrap. The
+  test-writer still has to write the API test.
+
+  **P2 ACs that came for free**
+  - AC-13: loading and error states with retry.
+  - AC-15: plan-unavailable state with "Cambiar plan".
+  - AC-16: option labels, locale dates, empty optional fields omitted.
+  - AC-17: acceptance resets on every entry (new component instance).
+  - AC-18: confirmation guard redirects to `/{cc}/datos`.
+  - AC-19: cancel closes the gateway and returns focus to "Pagar".
+  - AC-20 and AC-21: only the focus management and the 44px targets are in
+  place. Not verified.
+
+  **Spec gaps and judgements** (the spec was not changed)
+  - Checkbox fields: GAP-14 omits "optional empty fields". I show a boolean
+  checkbox value as Sí/No, including `false` as "No", and omit only `null`,
+  `undefined` and `''`.
+  - Country entry: the summary reuses the `CountryContext` in-memory cache for
+  `country` (terms and copy). The spec allows this for countries and
+  form-fields. A Strapi change to terms is therefore only seen after a page
+  reload. AC-14 e2e should intercept `/api/countries` or reload.
+  - "Pagar" stays visible but disabled while the gateway is open or processing.
+  This follows the §5 rule (enabled only in `idle` or `rejected`) and the AC-03
+  text ("Pagar" disabled).
+  - Clearing the store happens after the navigation to `/confirmacion` resolves,
+  to avoid a "plan unavailable" flash.
+
+  **Test hooks**
+  - Routes: `/co|cl/resumen` and `/co|cl/confirmacion`.
+  - Seeding state: write sessionStorage key `quote:v1:CO` (or `CL`) to
+  `{"v":1,"country":"CO","values":{...step-1 values by field
+  key},"planDocumentId":"<plan documentId>"}`. Or drive the UI through `/datos`
+  and `/planes`.
+  - Elements are found by role and accessible name: `getByRole('button',
+  {name})` for "Pagar", "Simular pago aprobado", "Simular pago rechazado",
+  "Cancelar", "Editar datos" and "Cambiar plan"; `getByLabel('Acepto los
+  términos y condiciones')` for the checkbox; `h1` for the title.
+  - `data-testid` values:
+    - **Summary:** `summary-policyholder`, `summary-vehicle`, `row-<fieldKey>`,
+  `summary-plan`, `summary-plan-name`, `summary-price`
+    - **Terms:** `terms`, `terms-body`, `terms-unavailable`
+    - **Gateway and payment:** `gateway`, `payment-processing`,
+  `payment-rejected` (`role="alert"`), `plan-unavailable`
+    - **States:** `summary-loading`, `summary-error`
+    - **Confirmation:** `quote-number`, `confirmation-plan`,
+  `confirmation-price`
+  - Simulated gateway: click "Pagar" to open the inline panel. "Simular pago
+  aprobado" approves and "Simular pago rechazado" rejects, each after 1500 ms.
+  - Unit tests can override the delay with `{ provide: PAYMENT_DELAY_MS,
+  useValue: 0 }` or use fake timers. They can fix the date with `{ provide:
+  CLOCK, useValue: () => new Date(...) }`.
+  - Pure functions to unit test: `maskDocument`, `generateQuoteNumber`,
+  `buildRows`.
+
+● Implementation is done (2 commits, build and unit tests green). The frontend
+  container needs a rebuild before the e2e can run, so I'm checking the known
+  Docker workaround first.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Implement US-03 P1 ACs" finished · 3m 9s
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Stack rebuilt with the US-03 code. Running the test-writer.
+
+● test-writer(Write and run US-03 tests)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● The implementation is in two commits on feat/US-03-summary-payment: a6f74b1
+  adds the summary helpers and 1010f80 adds the summary and confirmation screens
+  with simulated payment. The build passes and the existing unit tests pass
+  (95). No Strapi changes were needed, because the seed data already had the
+  terms and summary copy for both countries.
+
+  I rebuilt the frontend container with the workaround image build and the page
+  answers on http://127.0.0.1:4200/co/resumen.
+
+  The test-writer is now running. It is writing tests for the P1 acceptance
+  criteria (AC-01 to AC-12, AC-14, AC-22) and the keyboard-only Colombia flow
+  against 127.0.0.1:4200, and will then run the full unit and e2e suites. The
+  review comes after that, then I'll stop at HC3 with the findings table.
+
+  The implementer made these calls where the spec was unclear (it didn't change
+  the spec):
+  - Yes/no fields: shown as "Sí"/"No", including "No" when unchecked. Only truly
+    empty fields are left out of the summary.
+  - Terms text: cached in the browser, so a change to the terms in Strapi only
+    shows up after a page reload.
+  - Free extras: most P2 behaviours came along anyway (error with retry,
+    unavailable plan, guards, cancel and focus). Keyboard-only payment (AC-20)
+    and the 360px layout (AC-21) are not checked yet.
+
+› Message from test-writer
+  ## US-03 test run summary
+
+  **Result: one blocking production bug (TW-BUG-01) breaks every path into the
+  summary page. 22 e2e tests and 2 unit tests fail against the Docker stack
+  because of it. All of them pass when the bug is patched in a scratch copy.**
+
+  ### Commits (branch feat/US-03-summary-payment, not pushed)
+  - `4b05ba2` test(US-03): unit tests for mask, quote number, double submit,
+  terms and guard
+  - `f672480` test(US-03): e2e summary/payment per country and keyboard-only
+  full flow
+
+  Both carry `Refs: SPEC-US-03` and the `Co-Authored-By: Claude Opus 5.5` line.
+  No production code was changed.
+
+  ### Test files (all under C:\Proyectos\car-insurance-project\frontend)
+  - src\app\features\summary\summary.spec.ts (unit)
+  - src\app\features\summary\summary-guard.spec.ts (unit)
+  - e2e\us-03-summary-payment.spec.ts (e2e, CO and CL)
+  - e2e\full-flow-keyboard.spec.ts (keyboard-only full flow, CO)
+
+  ### Commands and counts
+  - Unit: `cd frontend && npm test`. 109 tests: 107 pass, 2 fail. The 2 failures
+  are the summaryGuard tests for TW-BUG-01. The other 105 existing tests plus
+  the new mask, quote number, AC-08 and AC-14 tests pass.
+  - E2E against the Docker stack: `E2E_BASE_URL=http://127.0.0.1:4200 npx
+  playwright test`. 40 tests: 18 pass, 22 fail.
+    - 21 fail with the summary page not rendering.
+    - The 22nd, `US-03-AC-11 ... (valid step 1, no plan)`, fails on its redirect
+  URL.
+    - The failing set also includes 3 existing US-02 tests that end on
+  `/resumen`: `US-02-AC-03` for co and cl, and `US-02-AC-03 ... real step 1 form
+  (co)`. Those are regressions from US-03.
+  - Verification against a patched copy: I copied `frontend/src` to the
+  scratchpad and applied a correct guard fix there (the repo is untouched). I
+  ran `ng serve` on port 4300 and ran `E2E_BASE_URL=http://127.0.0.1:4300 npx
+  playwright test us-03 full-flow us-02`. All 32 tests passed, including the
+  keyboard-only full flow. So the tests themselves are sound and the only
+  blocker is TW-BUG-01.
+  - Cleanup needed: that `ng serve` on port 4300 is still running. `pkill` was
+  denied by the permission system, so please stop it yourself. The scratch copy
+  is at `C:\Users\abelt\AppData\Local\Temp\claude\f559641e098c878a\25ebac23-91ff
+  -4f9f-bf0f-8b5fbc3c10ed\scratchpad\fe`.
+
+  ### Full-flow keyboard e2e
+  `US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only`
+  uses `page.keyboard` only: step 1 → plans (Tab, ArrowDown) → Continuar (Enter)
+  → summary → Space on the terms checkbox → Enter on Pagar → approve with
+  Enter. It also asserts focus on the summary h1, the gateway heading and the
+  confirmation h1, and the `COT-CO-\d{8}-[A-Z0-9]{6}` quote number.
+  - Against the Docker stack: FAILS (TW-BUG-01). It stays on `/co/planes` after
+  Continuar.
+  - Against the patched copy on port 4300: PASSES in 5.2 s.
+
+  ### P1 coverage (AC → test name → result on the Docker stack)
+  | AC | Level | Test name | Result |
+  |---|---|---|---|
+  | AC-01 | e2e co, cl | `US-03-AC-01 summary shows policyholder, vehicle and
+  plan with final price (co/cl)` | FAIL, TW-BUG-01 |
+  | AC-02 | e2e co, cl | `US-03-AC-02 terms from Strapi per country gate the pay
+  button (co/cl)` | FAIL, TW-BUG-01 |
+  | AC-02 | unit | no separate unit test for terms gating; AC-14 covers the
+  disabled state | not added |
+  | AC-03 | e2e co, cl | `US-03-AC-03 approved payment locks controls and shows
+  quote number (co/cl)` | FAIL, TW-BUG-01 |
+  | AC-04 | e2e co, cl | `US-03-AC-04 rejected payment keeps data and allows
+  retry (co/cl)` | FAIL, TW-BUG-01 |
+  | AC-05 | unit | `US-03-AC-05 masks document leaving last 4 characters (...)`,
+  6 tests: CO, CL, letters, short values, `maskInSummary` selection, full value
+  not in DOM | pass |
+  | AC-05 | e2e co, cl | `US-03-AC-05 masks document leaving last 4 characters
+  (co/cl)` | FAIL, TW-BUG-01 |
+  | AC-06 | e2e co, cl | `US-03-AC-06 edit data returns to step 1 with values
+  (co/cl)` | FAIL, TW-BUG-01 |
+  | AC-07 | e2e co, cl | `US-03-AC-07 change plan preselects current plan
+  (co/cl)` | FAIL, TW-BUG-01 |
+  | AC-08 | unit | `US-03-AC-08 double click produces a single payment` (fake
+  timers) | pass |
+  | AC-08 | e2e co | `US-03-AC-08 double click produces a single payment` |
+  FAIL, TW-BUG-01 |
+  | AC-09 | unit | `US-03-AC-09 quote number matches pattern (...)`, 3 tests |
+  pass |
+  | AC-10 | e2e co | `US-03-AC-10 clears wizard state after approval` | FAIL,
+  TW-BUG-01 |
+  | AC-11 | e2e cl | `US-03-AC-11 summary guard redirects ... (no wizard state)`
+  | pass |
+  | AC-11 | e2e cl | `US-03-AC-11 summary guard redirects ... (valid step 1, no
+  plan)` | FAIL, TW-BUG-01 |
+  | AC-11 | unit (extra, 2 tests) | `US-03-AC-11 summary guard allows entry ...`
+  and `... redirects to planes ...` | both FAIL, TW-BUG-01 |
+  | AC-12 | e2e co | `US-03-AC-12 gateway has no card inputs` | FAIL, TW-BUG-01
+  |
+  | AC-14 | unit co | `US-03-AC-14 missing terms disable payment` (+ null
+  termsBody variant) | pass |
+  | AC-22 | e2e API | `US-03-AC-22 public write to countries is denied with 401
+  or 403` (POST, PUT and DELETE denied; GET 200) | pass |
+  | AC-20 (P2) | e2e | full-flow keyboard test above | FAIL, TW-BUG-01 |
+
+  P2 tests are skipped except AC-20. AC-13, 15, 16, 17, 18, 19 and 21 have no
+  automated tests and need a manual check at HC4, or P2 tests later.
+
+  ### Bugs
+  **TW-BUG-01**
+  - ACs: US-03-AC-01..08, 10, 11 (the "valid step 1, no plan" case), 12 and 20,
+  plus the US-02-AC-03 regressions.
+  - Steps: with valid step 1 data in sessionStorage, open `/co/resumen`, or
+  select a plan on `/co/planes` and press Continuar.
+  - Expected: the summary renders. With no plan selected, the guard redirects to
+  `/{cc}/planes`.
+  - Actual: the guard throws `NG0203: inject() must be called from an injection
+  context` and the app lands on `/` (an empty "Colombia" shell). On the plans
+  page, Continuar does nothing and the URL stays `/co/planes`.
+  - Location: `frontend/src/app/features/summary/summary-guard.ts`, in
+  `summaryGuard`. `inject(CountryContext)`, `inject(QuoteStore)` and
+  `inject(Router)` are called after `await plansGuard(route, state)`, so they
+  run outside the injection context.
+  - Fix: call all `inject()` at the top of the guard, before the `await`. I
+  confirmed this in the scratch copy.
+  - Why unit tests missed it: the existing unit tests never run the guard. The
+  two new guard unit tests expose it.
+  - Tests carrying `// BUG:` comments: `summary-guard.spec.ts` (2),
+  `us-03-summary-payment.spec.ts` (AC-01, 08, 10, 11 no-plan, 12) and
+  `full-flow-keyboard.spec.ts`.
+
+  There are no other bugs. Every other assertion passes on the patched copy,
+  including the CO and CL price formatting, terms text matching Strapi, the
+  masked document absent from the DOM, state cleared after approval and focus
+  management.
+
+  ### Notes
+  - The e2e tests seed `sessionStorage` in the ADR-004 shape and read plan
+  documentIds from the API. Seed data (plan names, `Rechazado` copy) is marked
+  as such in comments.
+  - The keyboard test relies on the seed copy "Continuar" and the Chromium en-US
+  date input, as the US-01 keyboard test does.
+
+● The test-writer found one blocking bug, TW-BUG-01: the summary guard calls
+  inject() after an await, which breaks every route into the summary. It goes
+  through the review and HC3 as a finding. Next I'm writing the review input.
+
+● Bash(B=ec0e59a8c2eb8b27c8da1ba88cbb672a01c79e00; H=$(git rev-parse HEAD); {
+      echo "# US-03 review input  base=$B head=$H"; echo "## Commits"; git log
+      --oneline $B..$H…)
+  ⎿  1 file changed (binary, mode only or too large to show)
+     docs\reviews\US-03.diff
+
+● Agent "Write and run US-03 tests" finished · 7m 21s
+
+● reviewer(Review US-03 changes)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● The tests are written, but a blocking bug in the summary guard means the
+  summary page never opens on the Docker stack. That bug is TW-BUG-01: in
+  summary-guard.ts (frontend/src/app/features/summary/summary-guard.ts),
+  inject() is called after an await.
+
+  Test results
+  - Unit tests: 107 of 109 pass. The 2 failures are the new summary-guard tests,
+    which expose TW-BUG-01.
+  - E2E on Docker (127.0.0.1:4200): 18 of 40 pass. The 22 failures all come from
+    TW-BUG-01, including 3 existing US-02 tests that now fail because they end
+    on the summary page.
+  - Keyboard-only Colombia flow: fails on Docker; it stays on /co/planes after
+    "Continuar". The test-writer fixed the guard in a scratch copy and served it
+    on port 4300. Against it, all 32 US-02, US-03 and full-flow e2e tests
+    passed, including the keyboard flow.
+  - Missing tests: AC-02 has no separate unit test. The P2 criteria (except
+    AC-20) have no automated tests.
+
+  Test commits are 4b05ba2 (unit) and f672480 (e2e). The review input is in
+  docs/reviews/US-03.diff and the reviewer is running. When it finishes I'll
+  show you the findings table for HC3; TW-BUG-01 will be one of them.
+
+  One thing for you to clean up: the test-writer's dev server on port 4300 is
+  still running. It tried to stop it with pkill and the permission system denied
+  that, so I left it alone. Please stop it yourself. Its scratch copy is at
+  C:\Users\abelt\AppData\Local\Temp\claude\f559641e098c878a\25ebac23-91ff-4f9f-b
+  f0f-8b5fbc3c10ed\scratchpad\fe.
+
+› Message from reviewer
+  # REVIEW-US-03 – Summary and payment
+
+  | Field | Value |
+  |-------|-------|
+  | Story | [US-03](../user-stories/US-03.md) |
+  | Spec | [SPEC-US-03](../specs/SPEC-US-03.md) (version 3, Approved) |
+  | ADRs checked | ADR-001, ADR-002, ADR-003, ADR-004 (all `Accepted`) |
+  | Branch | `feat/US-03-summary-payment` |
+  | Commit range | `ec0e59a..f672480` |
+  | Review input | [US-03.diff](US-03.diff) (changed files + diff, written by
+  the main session) |
+  | Test summary reviewed | unit: 107 passed / 2 failed · e2e: 18 passed / 22
+  failed (as reported by the test-writer; with TW-BUG-01 fixed in a scratch
+  copy: 32/32 US-02/US-03/full-flow e2e pass) |
+  | Reviewer | reviewer subagent (Claude Code, opus), read-only |
+  | Review date | 2026-11-23 |
+  | Human triage (HC3) | |
+
+  ## Findings
+
+  Source: `review` (found by the reviewer) · `test-writer` (bug reported by the
+  test-writer; every one must be logged here).
+  Severity: `blocker` (violates an AC, a non-negotiable or security; must fix) ·
+  `major` (likely bug or significant deviation) · `minor` (quality issue with
+  low risk) · `nit` (style).
+
+  Human decision (HC3): `fix now` · `accept risk: <reason>` · `out of scope:
+  <reason>`.
+  Status: `Open` · `Resolved` · `Accepted` · `Deferred`.
+
+  | ID | Source | Severity | File:line | Finding | Recommendation | Human
+  decision | Resolution commit | Status |
+  |----|--------|----------|-----------|---------|----------------|-------------
+  ---|-------------------|--------|
+  | REVIEW-US-03-F01 | test-writer | blocker |
+  `frontend/src/app/features/summary/summary-guard.ts:9-15` | TW-BUG-01.
+  Reported: the guard throws NG0203 "inject() must be called from an injection
+  context"; navigation to `/{cc}/resumen` fails (lands on `/`), "Continuar" on
+  plans does nothing. Failing: unit `US-03-AC-11 summary guard allows entry…`
+  and `…redirects to planes…`; 21 e2e tests that need the summary (AC-01..08,
+  10, 12, keyboard full flow `US-01-AC-12 US-03-AC-20…`), e2e `US-03-AC-11 …
+  (valid step 1, no plan)`, and 3 US-02 regressions (US-02-AC-03 co/cl, real
+  step 1 form co). Reviewer analysis confirmed: line 9 does `await
+  plansGuard(route, state)`, and lines 13-15 then call `inject(CountryContext)`,
+  `inject(QuoteStore)`, `inject(Router)`. The injection context exists only for
+  the synchronous part of a functional guard, so every path where step 1 is
+  valid throws. The "no wizard state" case passes only because `plansGuard`
+  returns before its own `await` (`plans-guard.ts:22-23`) and `summaryGuard`
+  returns at line 11. `plansGuard` itself is correct: it injects everything
+  first (`plans-guard.ts:12-16`). The `as GuardResult` cast at line 9 also hides
+  that `CanActivateFn` may return an Observable, which `await` would not
+  subscribe to. This blocks the P1 ACs AC-01..08, 10, 11 and 12, and
+  US-02-AC-03. | Move all `inject()` calls (CountryContext, QuoteStore, Router)
+  to the top of `summaryGuard`, before the `await`. Better: extract the step-1
+  check from `plansGuard` into a plain async function that takes its
+  dependencies as arguments, and call it from both guards so no cast is needed.
+  Re-run the 2 unit guard tests and the full US-02/US-03/full-flow e2e suites. |
+  | | Open |
+  | REVIEW-US-03-F02 | review | major |
+  `frontend/src/app/features/summary/summary.html:90`,
+  `frontend/src/app/features/summary/summary.ts:175-179` | You can complete a
+  payment without accepting the terms. The checkbox is disabled only when
+  `locked()` (state `processing`) or when terms are unavailable, so it stays
+  enabled while the gateway is open (state `gateway`). `simulate()` checks only
+  `state() === 'gateway'` and never re-checks `accepted()`. So: check terms →
+  "Pagar" → uncheck terms → "Simular pago aprobado" gives an approved payment
+  and a quote number with the box unchecked. This defeats the AC-02 / GAP-09
+  rule that payment is gated by acceptance (§5 "Pay enabled iff checkbox
+  checked"). The spec text locks the checkbox only during processing (GAP-17),
+  but this gap breaks the intent of the gating rule. | Pick one: (a) in
+  `simulate()`, refuse unless `accepted() && termsAvailable()`; or (b) close the
+  gateway (state → `idle`, focus to "Pagar") when the checkbox is unchecked; or
+  (c) also disable the checkbox while state is `gateway`. Option (a) plus (b)
+  keeps the state-level lock style of GAP-17. Add a unit test (e.g. under
+  `US-03-AC-02`). If (c) changes visible behavior, check whether the spec needs
+  a version bump. | | | Open |
+  | REVIEW-US-03-F03 | review | minor |
+  `frontend/src/app/features/summary/summary.ts:198-206` | ADR-004 "Clearing"
+  (`docs/adr/ADR-004-wizard-state-in-browser.md:54`) requires removing
+  `quote:v1:{CC}` **before** navigating to confirmation. `approve()` calls
+  `store.clear()` only after `await this.router.navigate(...)`. The implementer
+  flagged this as a deliberate choice, but it contradicts an accepted ADR.
+  Concrete risks: if the navigation rejects or is cancelled (e.g. a lazy chunk
+  load fails), `store.clear()` never runs, so the PII stays in sessionStorage
+  while a confirmation already sits in `ConfirmationStore`. The summary is also
+  left in state `approved` with no pay controls and no message. | Call
+  `this.store.clear()` before `router.navigate(...)`. `planUnavailable` already
+  excludes state `approved`, so nothing visible breaks. Handle a failed
+  navigation (e.g. reset state, or navigate to `/{cc}/datos`). If the current
+  order is preferred, have the architect amend ADR-004 (HC2) instead of
+  diverging silently. | | | Open |
+  | REVIEW-US-03-F04 | review | minor | `cms/src/bootstrap/seed-data.ts:256-268`
+  | Country matrix (SPEC-US-03 §3) says the terms body differs per country: CO
+  mentions "Superintendencia Financiera de Colombia (texto de ejemplo)" and CL
+  mentions "Comisión para el Mercado Financiero (texto de ejemplo)". The seed
+  uses one shared `TERMS` constant for both countries. So the per-country body
+  in AC-02 is not shown in the seed, and the AC-02 e2e test
+  (`us-03-summary-payment.spec.ts:130`) cannot catch a cross-country body
+  mix-up: only the title differs. This file is outside the commit range but is
+  the seed data that US-03 relies on. | Give CO and CL distinct fictitious
+  `termsBody` texts as the matrix says. Seed changes go under `cms/` on this
+  feat branch, which the gate allows because the spec is Approved. | | | Open |
+  | REVIEW-US-03-F05 | review | minor |
+  `frontend/e2e/us-03-summary-payment.spec.ts:91-112`;
+  `frontend/src/app/features/summary/summary.spec.ts` | Test gaps and weak
+  assertions: (1) the test mapping lists AC-02 as "e2e + unit", but there is no
+  `US-03-AC-02` unit test (the test-writer confirmed this). (2) In the AC-01 e2e
+  test, `draftOnlyField` (lines 111-112) is checked against the **Strapi API
+  response**, not the page, so it is tautological for the UI. (3) AC-01 checks
+  only that each row exists (`row-${key}` visible), not the Strapi label or the
+  displayed value. AC-01 requires "every … field label and value". | Add a unit
+  test `US-03-AC-02 terms from Strapi per country gate the pay button`
+  (title/body from the mocked country; pay disabled/enabled with the checkbox).
+  Assert that the page has no `row-draftOnlyField`, instead of checking the API.
+  Assert each row's `dt` equals the API `label`, and for at least one
+  non-masked field assert the `dd` value. | | | Open |
+  | REVIEW-US-03-F06 | review | minor |
+  `frontend/src/app/features/confirmation/confirmation-guard.ts:10-11`,
+  `frontend/src/app/features/confirmation/confirmation.ts:12-24` | When the
+  country cannot be resolved (Strapi unreachable), `confirmationGuard` returns
+  `true` and the Confirmation component renders an empty `<section>`: no h1, no
+  error, no retry. GAP-04 makes loading/error states with retry mandatory, and
+  GAP-22 says a deep link to `/{cc}/confirmacion` without data redirects to
+  `/{cc}/datos`. In this state there can never be a confirmation in memory for
+  the country. | When `country` is null, redirect to `/{route param}/datos`
+  (lowercase `:country` param from the route snapshot), where step 1 already
+  shows its technical error and retry. | | | Open |
+  | REVIEW-US-03-F07 | review | nit |
+  `frontend/src/app/shared/step-placeholder.ts:1-14`,
+  `frontend/src/app/app.routes.ts:7`,
+  `frontend/e2e/full-flow-keyboard.spec.ts:76-77,85` | Dead code and leftovers:
+  `StepPlaceholder` is no longer referenced by any route. The routes comment
+  "Step components are placeholders until the features replace them" is now
+  stale. In the keyboard e2e, `chosenName` is computed and then discarded with
+  `void chosenName`. The "Continuar" `tabTo` predicate has a redundant cast and
+  duplicate conditions. | Delete `step-placeholder.ts` and update the routes
+  comment. In the e2e, either assert `chosenName` on the summary
+  (`summary-plan-name`) or remove it, and simplify the predicate to
+  `button('Continuar')`. | | | Open |
+  | REVIEW-US-03-F08 | review | nit |
+  `frontend/src/app/features/summary/summary.ts:143-150`,
+  `frontend/src/app/features/confirmation/confirmation.ts:39-46` | Both
+  components re-implement copy lookup instead of using the shared `copy()`
+  helper (`frontend/src/app/core/country-config.ts:57`), the same pattern as
+  `PlanList`. Because `text()` is called from the template and from the `view`
+  computed, a missing key logs `console.warn` on every change detection. No PII
+  is logged (keys only). | Use `copy(this.country(), key, fallback)`, or put a
+  single `text()` on a shared base/helper. Optionally warn once per key. | | |
+  Open |
+  | REVIEW-US-03-F09 | review | nit |
+  `frontend/src/app/features/summary/summary.html:77,79` | The terms `<section
+  aria-labelledby="terms-title">` and the inner `<div role="region"
+  aria-labelledby="terms-title">` both form region landmarks with the same
+  accessible name, so screen readers announce two "Términos y condiciones – …"
+  regions. §7 requires the region only on the scrollable body. | Drop
+  `aria-labelledby` from the outer `<section>`, or make it a plain `<div>`, and
+  keep the region on the scrollable body. | | | Open |
+
+  ## Test-writer bugs
+
+  | Bug (as reported in the test run summary) | AC | Failing test | Finding ID |
+  |-------------------------------------------|----|--------------|------------|
+  | TW-BUG-01: `summaryGuard` calls `inject()` after `await plansGuard(...)` →
+  NG0203; `/{cc}/resumen` unreachable (lands on `/`), "Continuar" on plans does
+  nothing | US-03-AC-01..08, 10, 11 (no-plan case), 12, 20; US-02-AC-03 |
+  `US-03-AC-11 summary guard allows entry when step 1 is valid and a plan is
+  selected`, `US-03-AC-11 summary guard redirects to planes when step 1 is valid
+  and no plan is selected` (unit); 22 e2e incl. `US-03-AC-11 … (valid step 1,
+  no plan)`, `US-01-AC-12 US-03-AC-20 completes the full Colombia flow with
+  keyboard only`, US-02-AC-03 co/cl | REVIEW-US-03-F01 |
+
+  ## Spec conformance
+
+  | AC ID | Implemented | Tested (test name) | Notes |
+  |-------|-------------|--------------------|-------|
+  | US-03-AC-01 | yes (unreachable until F01) | `US-03-AC-01 summary shows
+  policyholder, vehicle and plan with final price (co/cl)` | Price recomputed
+  with `computeFinalPrice` from re-fetched plans. Assertions weak (F05). |
+  | US-03-AC-02 | yes, gap F02 | `US-03-AC-02 terms from Strapi per country gate
+  the pay button (co/cl)` (e2e only) | No unit test (F05). Seed bodies
+  identical (F04). Payment possible after unchecking (F02). |
+  | US-03-AC-03 | yes | `US-03-AC-03 approved payment locks controls and shows
+  quote number (co/cl)` | |
+  | US-03-AC-04 | yes | `US-03-AC-04 rejected payment keeps data and allows
+  retry (co/cl)` | Alert `role="alert"`, receives focus; checkbox stays checked.
+  |
+  | US-03-AC-05 | yes | `US-03-AC-05 masks document leaving last 4 characters`
+  (unit table + DOM; e2e co/cl) | Field selected by `maskInSummary` only;
+  matches §5 algorithm. |
+  | US-03-AC-06 | yes | `US-03-AC-06 edit data returns to step 1 with values
+  (co/cl)` | |
+  | US-03-AC-07 | yes | `US-03-AC-07 change plan preselects current plan
+  (co/cl)` | |
+  | US-03-AC-08 | yes | `US-03-AC-08 double click produces a single payment`
+  (unit, fake timers; e2e) | Lock enforced in state (`simulate()` accepts only
+  `gateway`). The unit test clicks twice with no re-render in between, so it
+  exercises the state-level lock. |
+  | US-03-AC-09 | yes | `US-03-AC-09 quote number matches pattern` (CL fixed
+  clock, CO zero-padded, randomness) | `crypto.getRandomValues`, local date.
+  Modulo bias accepted (simulated). |
+  | US-03-AC-10 | yes, ordering F03 | `US-03-AC-10 clears wizard state after
+  approval` | Clear happens after navigation, contrary to ADR-004 (F03). |
+  | US-03-AC-11 | broken (F01) | `US-03-AC-11 summary guard redirects to first
+  incomplete step (no wizard state / valid step 1, no plan)`; unit guard tests |
+  No-state case passes; no-plan case fails due to F01. |
+  | US-03-AC-12 | yes | `US-03-AC-12 gateway has no card inputs` | Gateway has
+  buttons only; no storage writes besides ADR-004 key. |
+  | US-03-AC-13 | yes (P2) | none | Error + retry present; untested (P2). |
+  | US-03-AC-14 | yes | `US-03-AC-14 missing terms disable payment` (empty and
+  null body) | |
+  | US-03-AC-15 | yes (P2) | none | `planUnavailable` state with "Cambiar plan",
+  no pay controls. |
+  | US-03-AC-16 | yes (P2) | none | Option label,
+  `Intl.DateTimeFormat(numberLocale)`, empty omitted. |
+  | US-03-AC-17 | yes (P2) | none | New component instance per visit →
+  `accepted` starts false. |
+  | US-03-AC-18 | yes (P2) | none | Strapi-down case: F06. |
+  | US-03-AC-19 | yes (P2) | none | Cancel → `idle`, focus to "Pagar". |
+  | US-03-AC-20 | yes (P2) | `US-01-AC-12 US-03-AC-20 completes the full
+  Colombia flow with keyboard only` | Passes once F01 is fixed (per
+  test-writer). |
+  | US-03-AC-21 | likely (P2) | none | `.button` min 44×44, single column below
+  768 px; not verified. |
+  | US-03-AC-22 | yes | `US-03-AC-22 public write to countries is denied with
+  401 or 403` | POST/PUT/DELETE checked, GET 200. |
+
+  ## Summary
+
+  - Overall: the summary/payment feature follows SPEC-US-03 v3 closely: state
+  machine, masking, quote format, inline gateway, focus management, plain-text
+  terms and no card data. It cannot ship as is. **F01 (blocker)** makes step 3
+  unreachable for any user with a valid step 1 and also breaks the US-02
+  "Continuar" flow. **F02 (major)** lets a payment be approved after the terms
+  checkbox has been unchecked. The remaining findings are an ADR-004 ordering
+  deviation, seed/test-coverage gaps and small cleanups.
+  - Implementer judgements assessed:
+    - (1) Checkbox fields shown as Sí/No, including `false`: conforms to GAP-14
+  ("checkbox → Sí/No"); no finding.
+    - (2) Terms from the in-memory CountryContext cache: allowed by SPEC-US-03
+  §4 ("countries … may be reused from a session cache"); only plans must be
+  re-fetched, and they are (`rxResource` per component instance). No finding.
+    - (3) "Pagar" visible but disabled during gateway/processing: consistent
+  with §5 and AC-03; no finding.
+    - (4) Store clear after navigation: contradicts ADR-004:54, logged as F03.
+  - Areas checked with no findings:
+    - **Security:** no `innerHTML`; terms are interpolated with `white-space:
+  pre-line`; `StrapiClient` is GET-only with no auth header; no PII in logs
+  (only copy keys and the pricing warning); confirmation and acceptance stay in
+  memory; no card keys.
+    - **Non-negotiables:** single build, no per-country branches in production
+  code, all copy keys exist in the CO/CL seed, standalone/OnPush/signals/control
+  flow, no NgModules, fictitious test data (`1111111111`, `11.111.111-1`,
+  `example.test`).
+    - **Robustness:** 10 s timeout inherited; loading/error/retry states; timer
+  cancelled on destroy (GAP-23).
+  - Process: the branch `feat/US-03-summary-payment` matches the gate rule, the
+  spec is Approved v3, and ADR-001..004 are Accepted. The commit subjects follow
+  Conventional Commits with the `US-03` scope. `Refs:` trailers could not be
+  verified from the review input, which contains only `--oneline` subjects.
+  - I ran no tests myself. All results come from the test-writer's summary.
+  - Re-review after fixes: pending.
+
+● Saving the review report verbatim and committing it with the diff.
+
+● Write(docs\reviews\REVIEW-US-03.md)
+  ⎿  Wrote 83 lines to docs\reviews\REVIEW-US-03.md
+       1 # REVIEW-US-03 – Summary and payment
+       2
+       3 | Field | Value |
+       4 |-------|-------|
+       5 | Story | [US-03](../user-stories/US-03.md) |
+       6 | Spec | [SPEC-US-03](../specs/SPEC-US-03.md) (version 3, Approv
+         ed) |
+       7 | ADRs checked | ADR-001, ADR-002, ADR-003, ADR-004 (all `Accept
+         ed`) |
+       8 | Branch | `feat/US-03-summary-payment` |
+     … +75 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Review US-03 changes" finished · 2m 50s
+
+● HC3: US-03 review findings
+
+  The reviewer logged 9 findings: 1 blocker, 1 major, 4 minor and 3 nits. The
+  report and its diff are committed in e3524a9 (REVIEW-US-03.md
+  (docs/reviews/REVIEW-US-03.md)).
+
+  ID: F01
+  Sev: blocker
+  Finding: (TW-BUG-01) The summary guard calls inject() after an await, so the
+    summary page can't be reached and "Continuar" on plans does nothing. It
+    causes all 22 e2e failures.
+  Proposal: fix
+  ────────────────────────────────────────
+  ID: F02
+  Sev: major
+  Finding: A payment can be approved after the terms checkbox is unchecked
+    while the gateway is open.
+  Proposal: fix: refuse the payment in simulate() unless terms are accepted,
+    and close the gateway on uncheck
+  ────────────────────────────────────────
+  ID: F03
+  Sev: minor
+  Finding: The saved quote is cleared from the browser after going to
+    confirmation, but ADR-004 says before. If navigation fails, the personal
+    data stays in the browser.
+  Proposal: fix (cheap, and the code contradicts an Accepted ADR)
+  ────────────────────────────────────────
+  ID: F04
+  Sev: minor
+  Finding: The seed uses the same terms text for CO and CL; the spec gives
+    different text per country.
+  Proposal: fix (cheap; the AC-02 test can't catch a mix-up between countries
+    otherwise)
+  ────────────────────────────────────────
+  ID: F05
+  Sev: minor
+  Finding: AC-02 has no unit test, and the AC-01 e2e assertions are weak (it
+    checks the API instead of the page, and doesn't check labels or values).
+  Proposal: fix (test-writer)
+  ────────────────────────────────────────
+  ID: F06
+  Sev: minor
+  Finding: When Strapi is unreachable, the confirmation page renders empty.
+  Proposal: accept: P2 case (AC-18), Strapi down only
+  ────────────────────────────────────────
+  ID: F07
+  Sev: nit
+  Finding: Leftover placeholder component, a stale comment, and an unused
+    variable in the e2e.
+  Proposal: accept: cosmetic
+  ────────────────────────────────────────
+  ID: F08
+  Sev: nit
+  Finding: The summary and confirmation duplicate the copy lookup instead of
+    using the shared copy() helper.
+  Proposal: accept: cosmetic, no user impact
+  ────────────────────────────────────────
+  ID: F09
+  Sev: nit
+  Finding: The terms area is announced twice by screen readers (two regions
+    with the same name).
+  Proposal: accept: low a11y impact
+
+  My default goes slightly beyond yours (fix blocker and major, accept the
+  rest): I also propose fixing F03, F04 and F05 because they're small. Please
+  reply per finding with fix, accept: <reason> or out of scope, or say "use the
+  proposal".
+
+> HC3 decisions for US-03:
+  - F01: fix.
+  - F02: fix as proposed.
+  - F03: fix (code must match Accepted ADR-004).
+  - F04: fix.
+  - F05: fix.
+  - F06: accept: P2 case (AC-18), only when Strapi is down.
+  - F07: accept: cosmetic.
+  - F08: accept: cosmetic, no user impact.
+  - F09: fix (overriding the proposal): accessibility is an explicit
+  requirement and the change is trivial; consistent with my decisions in US-01
+  F04 and US-02 F02.
+
+  Process note: F01 violates a rule that was already in the angular-conventions
+  skill since Phase 2, so the skill alone did not prevent it. Record this in
+  FLOW.md under "What did not work as expected", and as the adjustment add an
+  explicit item to the reviewer's checklist ("guards/resolvers: inject() before
+  any await") plus a unit test pattern for async guards in the skill.
+
+● Recording the HC3 decisions, then starting the fix round. I'll do the
+  process-note updates (FLOW.md, reviewer checklist, skill) while the
+  implementer works.
+● Bash(f=docs/reviews/REVIEW-US-03.md
+      d() { sed -i "/^| REVIEW-US-03-$1 |/s/| | | Open |\$/| $2 | | $3 |/" $f;
+      }…)
+  ⎿  Updated docs\reviews\REVIEW-US-03.md +10 -10
+      11  | Test summary reviewed | unit: 107 passed / 2 failed · e2e: 18
+           passed / 22 failed (as reported by the test-writer; with TW-BU
+          G-01 fixed in a scratch copy: 32/32 US-02/US-03/full-flow e2e p
+          ass) |
+      12  | Reviewer | reviewer subagent (Claude Code, opus), read-only |
+      13  | Review date | 2026-11-23 |
+      14 -| Human triage (HC3) | |                                       
+      14 +| Human triage (HC3) | Andres Beltran, 2026-11-23: fix F01–F05,
+         + F09; accept F06–F08 |                                         
+      15 
+      16  ## Findings
+      17 
+     ...
+      23 
+      24  | ID | Source | Severity | File:line | Finding | Recommendation
+           | Human decision | Resolution commit | Status |
+      25  |----|--------|----------|-----------|---------|---------------
+          -|----------------|-------------------|--------|
+      26 -| REVIEW-US-03-F01 | test-writer | blocker | `frontend/src/app/
+         -features/summary/summary-guard.ts:9-15` | TW-BUG-01. Reported: 
+         -the guard throws NG0203 "inject() must be called from an inject
+         -ion context"; navigation to `/{cc}/resumen` fails (lands on `/`
+         -), "Continuar" on plans does nothing. Failing: unit `US-03-AC-1
+         -1 summary guard allows entry…` and `…redirects to planes…`; 21 
+         -e2e tests that need the summary (AC-01..08, 10, 12, keyboard fu
+         -ll flow `US-01-AC-12 US-03-AC-20…`), e2e `US-03-AC-11 … (valid 
+         -step 1, no plan)`, and 3 US-02 regressions (US-02-AC-03 co/cl, 
+         -real step 1 form co). Reviewer analysis confirmed: line 9 does 
+         -`await plansGuard(route, state)`, and lines 13-15 then call `in
+         -ject(CountryContext)`, `inject(QuoteStore)`, `inject(Router)`. 
+         -The injection context exists only for the synchronous part of a
+         - functional guard, so every path where step 1 is valid throws. 
+         -The "no wizard state" case passes only because `plansGuard` ret
+         -urns before its own `await` (`plans-guard.ts:22-23`) and `summa
+         -ryGuard` returns at line 11. `plansGuard` itself is correct: it
+         - injects everything first (`plans-guard.ts:12-16`). The `as Gua
+         -rdResult` cast at line 9 also hides that `CanActivateFn` may re
+         -turn an Observable, which `await` would not subscribe to. This 
+         -blocks the P1 ACs AC-01..08, 10, 11 and 12, and US-02-AC-03. | 
+         -Move all `inject()` calls (CountryContext, QuoteStore, Router) 
+         -to the top of `summaryGuard`, before the `await`. Better: extra
+         -ct the step-1 check from `plansGuard` into a plain async functi
+         -on that takes its dependencies as arguments, and call it from b
+         -oth guards so no cast is needed. Re-run the 2 unit guard tests 
+         -and the full US-02/US-03/full-flow e2e suites. | | | Open |    
+      27 -| REVIEW-US-03-F02 | review | major | `frontend/src/app/feature
+         -s/summary/summary.html:90`, `frontend/src/app/features/summary/
+         -summary.ts:175-179` | You can complete a payment without accept
+         -ing the terms. The checkbox is disabled only when `locked()` (s
+         -tate `processing`) or when terms are unavailable, so it stays e
+         -nabled while the gateway is open (state `gateway`). `simulate()
+         -` checks only `state() === 'gateway'` and never re-checks `acce
+         -pted()`. So: check terms → "Pagar" → uncheck terms → "Simular p
+         -ago aprobado" gives an approved payment and a quote number with
+         - the box unchecked. This defeats the AC-02 / GAP-09 rule that p
+         -ayment is gated by acceptance (§5 "Pay enabled iff checkbox che
+         -cked"). The spec text locks the checkbox only during processing
+         - (GAP-17), but this gap breaks the intent of the gating rule. |
+         - Pick one: (a) in `simulate()`, refuse unless `accepted() && te
+         -rmsAvailable()`; or (b) close the gateway (state → `idle`, focu
+         -s to "Pagar") when the checkbox is unchecked; or (c) also disab
+         -le the checkbox while state is `gateway`. Option (a) plus (b) k
+         -eeps the state-level lock style of GAP-17. Add a unit test (e.g
+         -. under `US-03-AC-02`). If (c) changes visible behavior, check 
+         -whether the spec needs a version bump. | | | Open |            
+      28 -| REVIEW-US-03-F03 | review | minor | `frontend/src/app/feature
+         -s/summary/summary.ts:198-206` | ADR-004 "Clearing" (`docs/adr/A
+         -DR-004-wizard-state-in-browser.md:54`) requires removing `quote
+         -:v1:{CC}` **before** navigating to confirmation. `approve()` ca
+         -lls `store.clear()` only after `await this.router.navigate(...)
+         -`. The implementer flagged this as a deliberate choice, but it 
+         -contradicts an accepted ADR. Concrete risks: if the navigation 
+         -rejects or is cancelled (e.g. a lazy chunk load fails), `store.
+         -clear()` never runs, so the PII stays in sessionStorage while a
+         - confirmation already sits in `ConfirmationStore`. The summary 
+         -is also left in state `approved` with no pay controls and no me
+         -ssage. | Call `this.store.clear()` before `router.navigate(...)
+         -`. `planUnavailable` already excludes state `approved`, so noth
+         -ing visible breaks. Handle a failed navigation (e.g. reset stat
+         -e, or navigate to `/{cc}/datos`). If the current order is prefe
+         -rred, have the architect amend ADR-004 (HC2) instead of divergi
+         -ng silently. | | | Open |                                      
+      29 -| REVIEW-US-03-F04 | review | minor | `cms/src/bootstrap/seed-d
+         -ata.ts:256-268` | Country matrix (SPEC-US-03 §3) says the terms
+         - body differs per country: CO mentions "Superintendencia Financ
+         -iera de Colombia (texto de ejemplo)" and CL mentions "Comisión 
+         -para el Mercado Financiero (texto de ejemplo)". The seed uses o
+         -ne shared `TERMS` constant for both countries. So the per-count
+         -ry body in AC-02 is not shown in the seed, and the AC-02 e2e te
+         -st (`us-03-summary-payment.spec.ts:130`) cannot catch a cross-c
+         -ountry body mix-up: only the title differs. This file is outsid
+         -e the commit range but is the seed data that US-03 relies on. |
+         - Give CO and CL distinct fictitious `termsBody` texts as the ma
+         -trix says. Seed changes go under `cms/` on this feat branch, wh
+         -ich the gate allows because the spec is Approved. | | | Open | 
+      30 -| REVIEW-US-03-F05 | review | minor | `frontend/e2e/us-03-summa
+         -ry-payment.spec.ts:91-112`; `frontend/src/app/features/summary/
+         -summary.spec.ts` | Test gaps and weak assertions: (1) the test 
+         -mapping lists AC-02 as "e2e + unit", but there is no `US-03-AC-
+         -02` unit test (the test-writer confirmed this). (2) In the AC-0
+         -1 e2e test, `draftOnlyField` (lines 111-112) is checked against
+         - the **Strapi API response**, not the page, so it is tautologic
+         -al for the UI. (3) AC-01 checks only that each row exists (`row
+         --${key}` visible), not the Strapi label or the displayed value.
+         - AC-01 requires "every … field label and value". | Add a unit t
+         -est `US-03-AC-02 terms from Strapi per country gate the pay but
+         -ton` (title/body from the mocked country; pay disabled/enabled 
+         -with the checkbox). Assert that the page has no `row-draftOnlyF
+         -ield`, instead of checking the API. Assert each row's `dt` equa
+         -ls the API `label`, and for at least one non-masked field asser
+         -t the `dd` value. | | | Open |                                 
+      31 -| REVIEW-US-03-F06 | review | minor | `frontend/src/app/feature
+         -s/confirmation/confirmation-guard.ts:10-11`, `frontend/src/app/
+         -features/confirmation/confirmation.ts:12-24` | When the country
+         - cannot be resolved (Strapi unreachable), `confirmationGuard` r
+         -eturns `true` and the Confirmation component renders an empty `
+         -<section>`: no h1, no error, no retry. GAP-04 makes loading/err
+         -or states with retry mandatory, and GAP-22 says a deep link to 
+         -`/{cc}/confirmacion` without data redirects to `/{cc}/datos`. I
+         -n this state there can never be a confirmation in memory for th
+         -e country. | When `country` is null, redirect to `/{route param
+         -}/datos` (lowercase `:country` param from the route snapshot), 
+         -where step 1 already shows its technical error and retry. | | |
+         - Open |                                                        
+      32 -| REVIEW-US-03-F07 | review | nit | `frontend/src/app/shared/st
+         -ep-placeholder.ts:1-14`, `frontend/src/app/app.routes.ts:7`, `f
+         -rontend/e2e/full-flow-keyboard.spec.ts:76-77,85` | Dead code an
+         -d leftovers: `StepPlaceholder` is no longer referenced by any r
+         -oute. The routes comment "Step components are placeholders unti
+         -l the features replace them" is now stale. In the keyboard e2e,
+         - `chosenName` is computed and then discarded with `void chosenN
+         -ame`. The "Continuar" `tabTo` predicate has a redundant cast an
+         -d duplicate conditions. | Delete `step-placeholder.ts` and upda
+         -te the routes comment. In the e2e, either assert `chosenName` o
+         -n the summary (`summary-plan-name`) or remove it, and simplify 
+         -the predicate to `button('Continuar')`. | | | Open |           
+      33 -| REVIEW-US-03-F08 | review | nit | `frontend/src/app/features/
+         -summary/summary.ts:143-150`, `frontend/src/app/features/confirm
+         -ation/confirmation.ts:39-46` | Both components re-implement cop
+         -y lookup instead of using the shared `copy()` helper (`frontend
+         -/src/app/core/country-config.ts:57`), the same pattern as `Plan
+         -List`. Because `text()` is called from the template and from th
+         -e `view` computed, a missing key logs `console.warn` on every c
+         -hange detection. No PII is logged (keys only). | Use `copy(this
+         -.country(), key, fallback)`, or put a single `text()` on a shar
+         -ed base/helper. Optionally warn once per key. | | | Open |     
+      34 -| REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/
+         -summary/summary.html:77,79` | The terms `<section aria-labelled
+         -by="terms-title">` and the inner `<div role="region" aria-label
+         -ledby="terms-title">` both form region landmarks with the same 
+         -accessible name, so screen readers announce two "Términos y con
+         -diciones – …" regions. §7 requires the region only on the scrol
+         -lable body. | Drop `aria-labelledby` from the outer `<section>`
+         -, or make it a plain `<div>`, and keep the region on the scroll
+         -able body. | | | Open |                                        
+      26 +| REVIEW-US-03-F01 | test-writer | blocker | `frontend/src/app/
+         +features/summary/summary-guard.ts:9-15` | TW-BUG-01. Reported: 
+         +the guard throws NG0203 "inject() must be called from an inject
+         +ion context"; navigation to `/{cc}/resumen` fails (lands on `/`
+         +), "Continuar" on plans does nothing. Failing: unit `US-03-AC-1
+         +1 summary guard allows entry…` and `…redirects to planes…`; 21 
+         +e2e tests that need the summary (AC-01..08, 10, 12, keyboard fu
+         +ll flow `US-01-AC-12 US-03-AC-20…`), e2e `US-03-AC-11 … (valid 
+         +step 1, no plan)`, and 3 US-02 regressions (US-02-AC-03 co/cl, 
+         +real step 1 form co). Reviewer analysis confirmed: line 9 does 
+         +`await plansGuard(route, state)`, and lines 13-15 then call `in
+         +ject(CountryContext)`, `inject(QuoteStore)`, `inject(Router)`. 
+         +The injection context exists only for the synchronous part of a
+         + functional guard, so every path where step 1 is valid throws. 
+         +The "no wizard state" case passes only because `plansGuard` ret
+         +urns before its own `await` (`plans-guard.ts:22-23`) and `summa
+         +ryGuard` returns at line 11. `plansGuard` itself is correct: it
+         + injects everything first (`plans-guard.ts:12-16`). The `as Gua
+         +rdResult` cast at line 9 also hides that `CanActivateFn` may re
+         +turn an Observable, which `await` would not subscribe to. This 
+         +blocks the P1 ACs AC-01..08, 10, 11 and 12, and US-02-AC-03. | 
+         +Move all `inject()` calls (CountryContext, QuoteStore, Router) 
+         +to the top of `summaryGuard`, before the `await`. Better: extra
+         +ct the step-1 check from `plansGuard` into a plain async functi
+         +on that takes its dependencies as arguments, and call it from b
+         +oth guards so no cast is needed. Re-run the 2 unit guard tests 
+         +and the full US-02/US-03/full-flow e2e suites. | fix now | | Op
+         +en |                                                           
+      27 +| REVIEW-US-03-F02 | review | major | `frontend/src/app/feature
+         +s/summary/summary.html:90`, `frontend/src/app/features/summary/
+         +summary.ts:175-179` | You can complete a payment without accept
+         +ing the terms. The checkbox is disabled only when `locked()` (s
+         +tate `processing`) or when terms are unavailable, so it stays e
+         +nabled while the gateway is open (state `gateway`). `simulate()
+         +` checks only `state() === 'gateway'` and never re-checks `acce
+         +pted()`. So: check terms → "Pagar" → uncheck terms → "Simular p
+         +ago aprobado" gives an approved payment and a quote number with
+         + the box unchecked. This defeats the AC-02 / GAP-09 rule that p
+         +ayment is gated by acceptance (§5 "Pay enabled iff checkbox che
+         +cked"). The spec text locks the checkbox only during processing
+         + (GAP-17), but this gap breaks the intent of the gating rule. |
+         + Pick one: (a) in `simulate()`, refuse unless `accepted() && te
+         +rmsAvailable()`; or (b) close the gateway (state → `idle`, focu
+         +s to "Pagar") when the checkbox is unchecked; or (c) also disab
+         +le the checkbox while state is `gateway`. Option (a) plus (b) k
+         +eeps the state-level lock style of GAP-17. Add a unit test (e.g
+         +. under `US-03-AC-02`). If (c) changes visible behavior, check 
+         +whether the spec needs a version bump. | fix now | | Open |    
+      28 +| REVIEW-US-03-F03 | review | minor | `frontend/src/app/feature
+         +s/summary/summary.ts:198-206` | ADR-004 "Clearing" (`docs/adr/A
+         +DR-004-wizard-state-in-browser.md:54`) requires removing `quote
+         +:v1:{CC}` **before** navigating to confirmation. `approve()` ca
+         +lls `store.clear()` only after `await this.router.navigate(...)
+         +`. The implementer flagged this as a deliberate choice, but it 
+         +contradicts an accepted ADR. Concrete risks: if the navigation 
+         +rejects or is cancelled (e.g. a lazy chunk load fails), `store.
+         +clear()` never runs, so the PII stays in sessionStorage while a
+         + confirmation already sits in `ConfirmationStore`. The summary 
+         +is also left in state `approved` with no pay controls and no me
+         +ssage. | Call `this.store.clear()` before `router.navigate(...)
+         +`. `planUnavailable` already excludes state `approved`, so noth
+         +ing visible breaks. Handle a failed navigation (e.g. reset stat
+         +e, or navigate to `/{cc}/datos`). If the current order is prefe
+         +rred, have the architect amend ADR-004 (HC2) instead of divergi
+         +ng silently. | fix now (code must match Accepted ADR-004) | | O
+         +pen |                                                          
+      29 +| REVIEW-US-03-F04 | review | minor | `cms/src/bootstrap/seed-d
+         +ata.ts:256-268` | Country matrix (SPEC-US-03 §3) says the terms
+         + body differs per country: CO mentions "Superintendencia Financ
+         +iera de Colombia (texto de ejemplo)" and CL mentions "Comisión 
+         +para el Mercado Financiero (texto de ejemplo)". The seed uses o
+         +ne shared `TERMS` constant for both countries. So the per-count
+         +ry body in AC-02 is not shown in the seed, and the AC-02 e2e te
+         +st (`us-03-summary-payment.spec.ts:130`) cannot catch a cross-c
+         +ountry body mix-up: only the title differs. This file is outsid
+         +e the commit range but is the seed data that US-03 relies on. |
+         + Give CO and CL distinct fictitious `termsBody` texts as the ma
+         +trix says. Seed changes go under `cms/` on this feat branch, wh
+         +ich the gate allows because the spec is Approved. | fix now | |
+         + Open |                                                        
+      30 +| REVIEW-US-03-F05 | review | minor | `frontend/e2e/us-03-summa
+         +ry-payment.spec.ts:91-112`; `frontend/src/app/features/summary/
+         +summary.spec.ts` | Test gaps and weak assertions: (1) the test 
+         +mapping lists AC-02 as "e2e + unit", but there is no `US-03-AC-
+         +02` unit test (the test-writer confirmed this). (2) In the AC-0
+         +1 e2e test, `draftOnlyField` (lines 111-112) is checked against
+         + the **Strapi API response**, not the page, so it is tautologic
+         +al for the UI. (3) AC-01 checks only that each row exists (`row
+         +-${key}` visible), not the Strapi label or the displayed value.
+         + AC-01 requires "every … field label and value". | Add a unit t
+         +est `US-03-AC-02 terms from Strapi per country gate the pay but
+         +ton` (title/body from the mocked country; pay disabled/enabled 
+         +with the checkbox). Assert that the page has no `row-draftOnlyF
+         +ield`, instead of checking the API. Assert each row's `dt` equa
+         +ls the API `label`, and for at least one non-masked field asser
+         +t the `dd` value. | fix now | | Open |                         
+      31 +| REVIEW-US-03-F06 | review | minor | `frontend/src/app/feature
+         +s/confirmation/confirmation-guard.ts:10-11`, `frontend/src/app/
+         +features/confirmation/confirmation.ts:12-24` | When the country
+         + cannot be resolved (Strapi unreachable), `confirmationGuard` r
+         +eturns `true` and the Confirmation component renders an empty `
+         +<section>`: no h1, no error, no retry. GAP-04 makes loading/err
+         +or states with retry mandatory, and GAP-22 says a deep link to 
+         +`/{cc}/confirmacion` without data redirects to `/{cc}/datos`. I
+         +n this state there can never be a confirmation in memory for th
+         +e country. | When `country` is null, redirect to `/{route param
+         +}/datos` (lowercase `:country` param from the route snapshot), 
+         +where step 1 already shows its technical error and retry. | acc
+         +ept risk: P2 case (AC-18), only when Strapi is down | | Accepte
+         +d |                                                            
+      32 +| REVIEW-US-03-F07 | review | nit | `frontend/src/app/shared/st
+         +ep-placeholder.ts:1-14`, `frontend/src/app/app.routes.ts:7`, `f
+         +rontend/e2e/full-flow-keyboard.spec.ts:76-77,85` | Dead code an
+         +d leftovers: `StepPlaceholder` is no longer referenced by any r
+         +oute. The routes comment "Step components are placeholders unti
+         +l the features replace them" is now stale. In the keyboard e2e,
+         + `chosenName` is computed and then discarded with `void chosenN
+         +ame`. The "Continuar" `tabTo` predicate has a redundant cast an
+         +d duplicate conditions. | Delete `step-placeholder.ts` and upda
+         +te the routes comment. In the e2e, either assert `chosenName` o
+         +n the summary (`summary-plan-name`) or remove it, and simplify 
+         +the predicate to `button('Continuar')`. | accept risk: cosmetic
+         + | | Accepted |                                                
+      33 +| REVIEW-US-03-F08 | review | nit | `frontend/src/app/features/
+         +summary/summary.ts:143-150`, `frontend/src/app/features/confirm
+         +ation/confirmation.ts:39-46` | Both components re-implement cop
+         +y lookup instead of using the shared `copy()` helper (`frontend
+         +/src/app/core/country-config.ts:57`), the same pattern as `Plan
+         +List`. Because `text()` is called from the template and from th
+         +e `view` computed, a missing key logs `console.warn` on every c
+         +hange detection. No PII is logged (keys only). | Use `copy(this
+         +.country(), key, fallback)`, or put a single `text()` on a shar
+         +ed base/helper. Optionally warn once per key. | accept risk: co
+         +smetic, no user impact | | Accepted |                          
+      34 +| REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/
+         +summary/summary.html:77,79` | The terms `<section aria-labelled
+         +by="terms-title">` and the inner `<div role="region" aria-label
+         +ledby="terms-title">` both form region landmarks with the same 
+         +accessible name, so screen readers announce two "Términos y con
+         +diciones – …" regions. §7 requires the region only on the scrol
+         +lable body. | Drop `aria-labelledby` from the outer `<section>`
+         +, or make it a plain `<div>`, and keep the region on the scroll
+         +able body. | fix now (overrides proposal: accessibility is an e
+         +xplicit requirement and the change is trivial; consistent with 
+         +US-01 F04 and US-02 F02) | | Open |                            
+      35 
+      36  ## Test-writer bugs
+      37 
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● The decisions are recorded. Starting the implementer on F01–F04 and F09 (F05
+  is test-only, so it goes to the test-writer).
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● implementer(Fix US-03 HC3 findings)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● Now the process note. Reading the relevant sections.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Update(.claude\agents\reviewer.md)
+  ⎿  Added 1 line
+      32     5. **Accessibility:** labels, `aria-describedby` for errors,
+           focus management between steps, keyboard-only completion, cont
+          rast hints.
+      33     6. **Robustness:** loading, empty and error states, Strapi u
+          navailable, invalid config from CMS, double submit.
+      34     7. **Code quality:** angular-conventions adherence, typing (
+          `any`), dead code, duplication.
+      35 +      - **Guards/resolvers: `inject()` before any `await`.** In
+         + every functional guard or resolver in the diff, every `inject(
+         +)` call (direct, or inside a helper it calls) must come before 
+         +the first `await`/`.then`. One placed after it throws NG0203 at
+         + runtime, and only on the code path that crosses the `await`. C
+         +heck that a unit test runs that path (see the async-guard test 
+         +pattern in the `angular-conventions` skill §8). Report a violat
+         +ion as `blocker` (added after REVIEW-US-03-F01).               
+      36     8. **Process:** commits follow conventions, the branch match
+          es the spec gate rule (no feature code from `chore/scaffold-*`)
+          , and the spec `version` the code was built against is the curr
+          ent approved one.
+      37  3. **Log every bug reported by the test-writer as a finding**,
+          one finding per bug, with source `test-writer`. Use the reporte
+          d AC, symptom and failing test as evidence, and add your own `f
+          ile:line` analysis of the cause. Do this even if you think the
+          bug is minor or the test is wrong: in that case say so in the r
+          ecommendation, and the human decides at HC3. Never drop a repor
+          ted bug.
+      38  4. Write each finding with an ID `REVIEW-US-XX-FNN`, source (`r
+          eview` | `test-writer`), severity (`blocker` | `major` | `minor
+          ` | `nit`), `file:line`, what is wrong (with evidence), and a c
+          oncrete recommendation. Leave "Human decision", "Resolution com
+          mit" and "Status" empty or `Open`.
+
+● Update(.claude\skills\angular-conventions\SKILL.md)
+  ⎿  Added 15 lines
+       89  - Unit tests run on **Vitest**, the Angular CLI default (`@ang
+           ular/build:unit-test` builder) ([testing](https://angular.dev/
+           guide/testing)). TestBed is zoneless by default.
+       90  - Test pure functions directly (mapper, validators, price rule
+           , mask). Test components through the DOM with roles and labels
+           . Mock HTTP with `provideHttpClientTesting`.
+       91  - E2E with Playwright against the seeded stack. Test names sta
+           rt with the AC ID.
+       92 +- **Async functional guards/resolvers need a unit test for eve
+          +ry path that crosses an `await`.** The §6 rule (`inject()` bef
+          +ore the first `await`) was in this skill and was still broken 
+          +in US-03 (REVIEW-US-03-F01). The existing tests never ran the 
+          +guard, and the early-return path doesn't reach the `await`, so
+          + a guard can look fine and still throw NG0203 for real users. 
+          +Pattern:                                                      
+       93 +  ```ts                                                       
+       94 +  // Run the guard exactly as the router does: inside an injec
+          +tion context, then await the result.                          
+       95 +  const run = (url: string) =>                                
+       96 +    TestBed.runInInjectionContext(() =>                       
+       97 +      summaryGuard(routeFor(url), { url } as RouterStateSnapsh
+          +ot),                                                          
+       98 +    ) as Promise<GuardResult>;                                
+       99 
+      100 +  it('US-03-AC-11 allows entry when step 1 is valid and a plan
+          + is selected', async () => {                                  
+      101 +    seedStore({ values: validStep1, planDocumentId: 'p1' }); /
+          +/ state that makes the guard go past its first await          
+      102 +    httpMock(...);                                            
+          + // let the awaited fetch resolve                             
+      103 +    expect(await run('/co/resumen')).toBe(true);              
+          + // NG0203 would reject here                                  
+      104 +  });                                                         
+      105 +  ```                                                         
+      106 +  Cover at least: (1) the early-redirect path, (2) every path 
+          +that continues after the `await` (allow and each redirect). As
+          +sert the returned `UrlTree` with `router.serializeUrl(result)`
+          +. A guard that composes another guard (`await otherGuard(...)`
+          +) must take its dependencies up front; prefer extracting the s
+          +hared check into a plain async function that receives them as 
+          +arguments.                                                    
+      107 +                                                              
+      108  ## 9. Accessibility checklist (every step)
+      109 
+      110  - [ ] Every control has a visible `<label for>` (or `aria-labe
+           lledby`) with Strapi's `label`. Placeholders are not labels.
+
+● Update(FLOW.md)
+  ⎿  Added 1 line
+      113  - **Finding 2 (security): drafts are readable with `?status=dr
+           aft` (2026-11-23, Phase 2).** Strapi 5.63 honors `status=draft
+           ` for anonymous `find`, so the Public role can read unpublishe
+           d entries. Draft & Publish hides drafts from the app's queries
+           , not from a direct caller. ADR-003 did not anticipate this. *
+           *Human decision (Andres Beltran):** accepted as a known risk f
+           or now (low impact: unpublished business content, no personal
+           data), recorded in README "Known risks". **Proposed fix, if ti
+           me remains:** a global Strapi middleware that forces `status=p
+           ublished` on unauthenticated `/api` requests, plus a test.
+      114  - **Skills corrected from verified facts (Phase 2).** Implemen
+           ters reported where the `strapi5-content-modeling` and `angula
+           r-conventions` skills were unverified or wrong (permission mod
+           el, 403 vs 405, strict params, `rxResource` for timeouts, `inj
+           ect()` before `await` in guards). The main session updated the
+            skills so later stories start from verified facts.
+      115  - **Windows host issues (Phase 2).** Docker Compose 5.6 bake f
+           ailed on drive-letter case (`BUILDX_BAKE_ENTITLEMENTS_FS=0` wo
+           rkaround, in README troubleshooting), and CRLF checkouts broke
+            the cms entrypoint (`.gitattributes` with `*.sh eol=lf`).
+      116 +- **A rule in a skill did not prevent the bug it describes (20
+          +26-11-23, US-03).** Since Phase 2 the `angular-conventions` sk
+          +ill said "in async functional guards, call every `inject()` be
+          +fore the first `await`". The US-03 implementer still wrote `su
+          +mmaryGuard` with `inject()` after `await plansGuard(...)`. It 
+          +compiled, the build and the existing 95 unit tests passed, and
+          + none of them ran the guard. At runtime every user with a vali
+          +d step 1 hit NG0203, so the summary page could not be reached 
+          +and US-02's "Continuar" broke too. The test-writer's new guard
+          + unit tests and the e2e suite caught it (TW-BUG-01, [REVIEW-US
+          +-03-F01](docs/reviews/REVIEW-US-03.md), blocker). **Lesson:** 
+          +guidance the agent reads while writing code is not enough for 
+          +a rule whose violation is invisible until runtime. It needs a 
+          +check at a later step that doesn't depend on the author rememb
+          +ering it. **Adjustment (Andres Beltran, HC3):** (1) an explici
+          +t item in the reviewer's checklist (`.claude/agents/reviewer.m
+          +d`, step 2.7: "guards/resolvers: `inject()` before any `await`
+          +", reported as blocker); (2) a unit-test pattern for async gua
+          +rds in the `angular-conventions` skill §8 that runs the guard 
+          +in `TestBed.runInInjectionContext` and covers every path that 
+          +crosses the `await`.                                          
+      117 
+      118  TODO (remaining items at project end)
+      119 
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The fix round is running. Done so far:
+
+  - HC3 decisions: recorded in REVIEW-US-03.md (docs/reviews/REVIEW-US-03.md)
+    and committed in 4d4731d.
+  - Process note (committed in 8dbbe7e):
+    - FLOW.md: new entry under "What did not work as expected". The rule was in
+      the skill but nothing checked it at a later step, so the adjustment adds
+      that check.
+    - reviewer.md (.claude/agents/reviewer.md): new checklist item 2.7,
+      "guards/resolvers: inject() before any await", reported as a blocker.
+    - angular-conventions SKILL.md (.claude/skills/angular-conventions/SKILL.md)
+      §8: a unit-test pattern for async guards. It runs the guard in
+      TestBed.runInInjectionContext and covers every path that continues past
+      the await.
+
+  The implementer has committed the F01 fix (0e598a7) and is working on F02,
+  F03, F04 and F09. After that, the test-writer will do F05 and re-run the unit
+  tests and all the e2e tests, including the keyboard flow.
+
+› Message from implementer
+  All five findings are fixed on `feat/US-03-summary-payment`. `ng build` is
+  clean and `npm test` passes: 12 files, 109 tests, including the 2
+  `summary-guard.spec.ts` tests marked `// BUG:`. I did not run e2e or a Strapi
+  boot. No push, merge or branch switch, and the spec gate never blocked. The
+  spec is Approved v3.
+
+  **Commits**
+  | Finding | Commit | Files |
+  |---|---|---|
+  | F01 | `0e598a7` | `frontend/src/app/features/plan-list/plans-guard.ts`,
+  `frontend/src/app/features/summary/summary-guard.ts` |
+  | F02 | `7282b88` | `frontend/src/app/features/summary/summary.ts` |
+  | F03 | `d450e35` | `frontend/src/app/features/summary/summary.ts` |
+  | F09 | `d450e35` (shares the commit with F03, see below) |
+  `frontend/src/app/features/summary/summary.html` |
+  | F04 | `59fd7d0` | `cms/src/bootstrap/seed-data.ts` |
+
+  F09 has no commit of its own. I edited `summary.html` before committing F03,
+  so `git add frontend` picked it up. The F09 commit message and `Refs:
+  REVIEW-US-03-F09` trailer therefore never landed. If you want the
+  traceability, record `d450e35` as F09's resolving commit.
+
+  **What changed**
+  - **F01:** `plans-guard.ts` now exports `injectStep1Deps()` and a plain async
+  `checkStep1(deps)`. `plansGuard` and `summaryGuard` both use them.
+  `summaryGuard` calls `inject()` before its first `await`, and the `as
+  GuardResult` cast is gone.
+  - **F02:** `simulate()` now returns unless the state is `gateway`,
+  `accepted()` is true and `termsAvailable()` is true. Unchecking the box while
+  the state is `gateway` sets the state to `idle` and focuses "Pagar".
+  - **F03:** `approve()` calls `store.clear()` before `router.navigate(...)` to
+  confirmation, as ADR-004 requires. If the navigation returns false, it clears
+  the confirmation and navigates to `/{cc}/datos`. `planUnavailable` already
+  excludes state `approved`, so there is no "plan unavailable" flash.
+  - **F09:** the outer terms `<section aria-labelledby>` is now a plain `<div
+  class="terms">`. Only the scrollable body keeps `role="region"` with
+  `aria-labelledby="terms-title"`.
+  - **F04:** `TERMS` is split into `TERMS_CO` and `TERMS_CL`, both fictitious.
+    - CO mentions "Superintendencia Financiera de Colombia (texto de ejemplo)".
+    - CL mentions "Comisión para el Mercado Financiero (texto de ejemplo)".
+
+  **Applying the seed to an existing Strapi DB**
+  - **Bootstrap does not update existing entries.** `seed()` in
+  `cms/src/bootstrap/seed.ts` only creates a country when none with that code
+  exists. An existing DB therefore keeps the old shared terms text.
+  - **Fastest option:** edit `termsBody` for CO and CL by hand in the Strapi
+  admin under Content Manager > Country. If Country has draft/publish, publish
+  after editing.
+  - **Clean option (docker):** the DB is in the `cms_data` volume. From the repo
+  root, run `docker compose down -v`, then `docker compose up`. With
+  `SEED_ON_BOOT=true` (the default) it re-seeds on boot. Per your memory note,
+  `compose --build` fails locally, so use the known workaround. `-v` also
+  deletes `cms_uploads` and anything else created in the admin.
+  - **Local `npm run develop` instead of docker:** delete the local SQLite file
+  (check `cms/.tmp/data.db`, or whatever `DATABASE_FILENAME` points to) and
+  restart with `SEED_ON_BOOT=true`.
+
+● All five fixes are committed and the unit tests pass. I'm rebuilding both
+  images so the e2e runs against the fixed code. The new terms texts won't reach
+  the existing Strapi database without a wipe, so I'll ask you about that
+  separately.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Fix US-03 HC3 findings" finished · 1m 29s
+
+● The CMS image failed to build (its npm run build step). Checking whether the
+  F04 seed change caused it.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The F04 commit (59fd7d0) breaks the CMS build: there's an unterminated string
+  literal in seed-data.ts. I'm sending it back to the implementer.
+  ⎿  Resuming agent aa05f23
+
+● The implementer is fixing the seed syntax error in 59fd7d0. The frontend
+  container already runs the fixed code. I'm holding the test-writer until the
+  CMS image rebuilds cleanly, so the CMS doesn't restart in the middle of an e2e
+  run.
+
+› Message from implementer
+  The F04 seed syntax is repaired in commit `ebfc6df` (`fix(US-03): repair
+  per-country terms seed syntax (REVIEW-US-03-F04)`), and `cd cms && npm run
+  build` now passes.
+
+  - **Cause:** my earlier edit in commit `59fd7d0` wrote real newline characters
+  inside the quoted `TERMS_CO` and `TERMS_CL` strings instead of the
+  two-character `\n` escape. That produced the TS1002 "Unterminated string
+  literal" errors.
+  - **Fix:** both constants in
+  `/c/Proyectos/car-insurance-project/cms/src/bootstrap/seed-data.ts` are
+  single-line strings again, with `\n` escapes between the numbered lines. The
+  CO and CL texts are unchanged, including the Superintendencia Financiera de
+  Colombia and Comisión para el Mercado Financiero mentions.
+  - **Build output:** both the build context and the admin panel built without
+  errors. The only other output was git's CRLF line-ending warning on commit.
+
+  The seed re-apply instructions from my first report still hold: bootstrap only
+  creates missing countries, so an existing DB needs the terms text edited by
+  hand in the admin or a reset with `docker compose down -v`. The F09 note also
+  still holds: it shares commit `d450e35` with F03.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Fix US-03 HC3 findings" finished · 1m 17s
+
+● Both images are rebuilt and the stack is healthy. Running the test-writer for
+  F05 and the full re-run.
+
+● test-writer(F05 tests and US-03 re-run)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● All five fixes are committed and the stack has been rebuilt with them:
+
+  ┌─────────┬────────────────────────────────────────────────────────────────┐
+  │ Finding │                             Commit                             │
+  ├─────────┼────────────────────────────────────────────────────────────────┤
+  │ F01     │ 0e598a7                                                        │
+  ├─────────┼────────────────────────────────────────────────────────────────┤
+  │ F02     │ 7282b88                                                        │
+  ├─────────┼────────────────────────────────────────────────────────────────┤
+  │ F03     │ d450e35 (also contains the F09 change)                         │
+  ├─────────┼────────────────────────────────────────────────────────────────┤
+  │ F04     │ 59fd7d0, plus ebfc6df to repair a CMS build error that 59fd7d0 │
+  │         │  introduced                                                    │
+  └─────────┴────────────────────────────────────────────────────────────────┘
+
+  The F09 fix landed in the F03 commit, so I'll record d450e35 as its resolution
+  commit. The test-writer is now adding the F05 tests and re-running the whole
+  unit and e2e suite, including the keyboard flow.
+
+  Decision needed: the new per-country terms text from F04 isn't in your running
+  Strapi yet. Strapi only seeds countries that don't exist, so the existing
+  database keeps the old shared text. Two ways to get it there:
+
+  - Reset (my recommendation): docker compose down -v, then a rebuild. This
+    deletes the Strapi data volume, including any admin account or anything you
+    created by hand in Strapi. It also proves the "clean checkout" item of the
+    DoD.
+  - Manual: edit termsBody for CO and CL in the Strapi admin under Content
+    Manager › Country.
+
+  Which do you prefer? Without your OK I won't run the reset. I'd do it after
+  the test run finishes.
+
+› Message from test-writer
+  The e2e suite is green (40/40). The unit suite has one failing test, which is
+  a new bug, TW-BUG-02. I did not change production code.
+
+  **Commit:** `0fcb455` `test(US-03): terms gating unit tests, stronger AC-01
+  row assertions, drop fixed BUG markers (REVIEW-US-03-F05)`
+  - Trailers: `Refs: SPEC-US-03, REVIEW-US-03-F05` and `Co-Authored-By: Claude
+  Opus 5.5 <noreply@anthropic.com>`.
+  - Only spec files changed:
+    - `frontend/src/app/features/summary/summary.spec.ts`
+    - `frontend/src/app/features/summary/summary-guard.spec.ts`
+    - `frontend/e2e/us-03-summary-payment.spec.ts`
+    - `frontend/e2e/full-flow-keyboard.spec.ts`
+
+  **What changed**
+  - **F05(a):** added unit test `US-03-AC-02 terms from Strapi per country gate
+  the pay button`. It checks the title and body come from the mocked country,
+  and that Pagar is disabled until the checkbox is checked and enabled after.
+  - **F05(b), AC-01 e2e:** it now asserts on the page that `row-draftOnlyField`
+  has count 0, instead of checking the API.
+  - **F05(c), AC-01 e2e:** each row's `dt` must equal the Strapi API `label`.
+  The `dd` of `row-firstName` (a non-masked field) must equal the entered value.
+  - **Task 2:** added unit test `US-03-AC-02 unchecking terms while the gateway
+  is open blocks approval`. It uses a payment delay of 0 and attaches the
+  fixture to the document so focus can be checked. It checks the gateway closes,
+  the Approve button is gone, Pagar is disabled, nothing is persisted, and
+  focus is on Pagar.
+  - **Task 3:** removed every `// BUG: TW-BUG-01` comment, in both e2e specs and
+  in `summary-guard.spec.ts`. The tests themselves are unchanged.
+
+  **Unit suite**
+  - Command: `cd frontend && npm test`.
+  - Result: 110 passed, 1 failed (111 tests in 12 files).
+  - The one failure is the new F02 test, `US-03-AC-02 unchecking terms while the
+  gateway is open blocks approval`. The failing assertion is the focus check,
+  `expect(document.activeElement).toBe(button(el,'PAY'))`.
+
+  **E2E suite**
+  - Command: `cd frontend && E2E_BASE_URL=http://127.0.0.1:4200 npx playwright
+  test`.
+  - Result: 40 passed, 0 failed. This covers US-01, US-02, US-03, the AC-22 API
+  test and the AC-15 and AC-19 public-write tests.
+  - No dev server was started.
+  - **Keyboard full-flow test:** `US-01-AC-12 US-03-AC-20 completes the full
+  Colombia flow with keyboard only` **PASSED** (5.2s).
+
+  **TW-BUG-02**
+  - **AC:** US-03-AC-02, F02 follow-up.
+  - **Failing test:** `US-03-AC-02 unchecking terms while the gateway is open
+  blocks approval` (unit).
+  - **Symptom:** after unchecking terms while the gateway is open, the gateway
+  closes and approval is blocked (those assertions pass), but
+  `document.activeElement` is `<body>`.
+  - **Expected vs actual:** expected focus on the "Pagar" button, got `<body>`.
+  - **Likely cause:** in `frontend/src/app/features/summary/summary.ts`, around
+  line 158 in the terms-change handler, `focusLater(this.payButton)` runs when
+  the box is unchecked. At that point Pagar is disabled, and `focus()` on a
+  disabled button does nothing. Keyboard and screen-reader users lose their
+  place.
+  - **Possible fix:** focus the checkbox instead, or move focus before
+  disabling.
+  - **Status:** the test carries a `// BUG: TW-BUG-02` comment and the assertion
+  is unchanged. The e2e suite has no focus check for this case, so it is not
+  covered there.
+
+  The e2e run left the usual Playwright output under
+  `frontend/e2e/test-results`, which I did not commit.
+
+● e2e is 40/40, including the keyboard full flow. The unit suite has 1 failure,
+  a new test-writer bug (TW-BUG-02). Every test-writer bug must become a
+  finding, so I'm logging it as F10 and filling in the resolution commits.
+
+● Bash(f=docs/reviews/REVIEW-US-03.md
+      r() { sed -i "/^| REVIEW-US-03-$1 |/s/| | Open |\$/| \`$2\` | Resolved |/"
+      $f; }…)
+  ⎿  Updated docs\reviews\REVIEW-US-03.md +6 -6
+      23 
+      24  | ID | Source | Severity | File:line | Finding | Recommendation
+           | Human decision | Resolution commit | Status |
+      25  |----|--------|----------|-----------|---------|---------------
+          -|----------------|-------------------|--------|
+      26 -| REVIEW-US-03-F01 | test-writer | blocker | `frontend/src/app/
+         -features/summary/summary-guard.ts:9-15` | TW-BUG-01. Reported: 
+         -the guard throws NG0203 "inject() must be called from an inject
+         -ion context"; navigation to `/{cc}/resumen` fails (lands on `/`
+         -), "Continuar" on plans does nothing. Failing: unit `US-03-AC-1
+         -1 summary guard allows entry…` and `…redirects to planes…`; 21 
+         -e2e tests that need the summary (AC-01..08, 10, 12, keyboard fu
+         -ll flow `US-01-AC-12 US-03-AC-20…`), e2e `US-03-AC-11 … (valid 
+         -step 1, no plan)`, and 3 US-02 regressions (US-02-AC-03 co/cl, 
+         -real step 1 form co). Reviewer analysis confirmed: line 9 does 
+         -`await plansGuard(route, state)`, and lines 13-15 then call `in
+         -ject(CountryContext)`, `inject(QuoteStore)`, `inject(Router)`. 
+         -The injection context exists only for the synchronous part of a
+         - functional guard, so every path where step 1 is valid throws. 
+         -The "no wizard state" case passes only because `plansGuard` ret
+         -urns before its own `await` (`plans-guard.ts:22-23`) and `summa
+         -ryGuard` returns at line 11. `plansGuard` itself is correct: it
+         - injects everything first (`plans-guard.ts:12-16`). The `as Gua
+         -rdResult` cast at line 9 also hides that `CanActivateFn` may re
+         -turn an Observable, which `await` would not subscribe to. This 
+         -blocks the P1 ACs AC-01..08, 10, 11 and 12, and US-02-AC-03. | 
+         -Move all `inject()` calls (CountryContext, QuoteStore, Router) 
+         -to the top of `summaryGuard`, before the `await`. Better: extra
+         -ct the step-1 check from `plansGuard` into a plain async functi
+         -on that takes its dependencies as arguments, and call it from b
+         -oth guards so no cast is needed. Re-run the 2 unit guard tests 
+         -and the full US-02/US-03/full-flow e2e suites. | fix now | | Op
+         -en |                                                           
+      27 -| REVIEW-US-03-F02 | review | major | `frontend/src/app/feature
+         -s/summary/summary.html:90`, `frontend/src/app/features/summary/
+         -summary.ts:175-179` | You can complete a payment without accept
+         -ing the terms. The checkbox is disabled only when `locked()` (s
+         -tate `processing`) or when terms are unavailable, so it stays e
+         -nabled while the gateway is open (state `gateway`). `simulate()
+         -` checks only `state() === 'gateway'` and never re-checks `acce
+         -pted()`. So: check terms → "Pagar" → uncheck terms → "Simular p
+         -ago aprobado" gives an approved payment and a quote number with
+         - the box unchecked. This defeats the AC-02 / GAP-09 rule that p
+         -ayment is gated by acceptance (§5 "Pay enabled iff checkbox che
+         -cked"). The spec text locks the checkbox only during processing
+         - (GAP-17), but this gap breaks the intent of the gating rule. |
+         - Pick one: (a) in `simulate()`, refuse unless `accepted() && te
+         -rmsAvailable()`; or (b) close the gateway (state → `idle`, focu
+         -s to "Pagar") when the checkbox is unchecked; or (c) also disab
+         -le the checkbox while state is `gateway`. Option (a) plus (b) k
+         -eeps the state-level lock style of GAP-17. Add a unit test (e.g
+         -. under `US-03-AC-02`). If (c) changes visible behavior, check 
+         -whether the spec needs a version bump. | fix now | | Open |    
+      28 -| REVIEW-US-03-F03 | review | minor | `frontend/src/app/feature
+         -s/summary/summary.ts:198-206` | ADR-004 "Clearing" (`docs/adr/A
+         -DR-004-wizard-state-in-browser.md:54`) requires removing `quote
+         -:v1:{CC}` **before** navigating to confirmation. `approve()` ca
+         -lls `store.clear()` only after `await this.router.navigate(...)
+         -`. The implementer flagged this as a deliberate choice, but it 
+         -contradicts an accepted ADR. Concrete risks: if the navigation 
+         -rejects or is cancelled (e.g. a lazy chunk load fails), `store.
+         -clear()` never runs, so the PII stays in sessionStorage while a
+         - confirmation already sits in `ConfirmationStore`. The summary 
+         -is also left in state `approved` with no pay controls and no me
+         -ssage. | Call `this.store.clear()` before `router.navigate(...)
+         -`. `planUnavailable` already excludes state `approved`, so noth
+         -ing visible breaks. Handle a failed navigation (e.g. reset stat
+         -e, or navigate to `/{cc}/datos`). If the current order is prefe
+         -rred, have the architect amend ADR-004 (HC2) instead of divergi
+         -ng silently. | fix now (code must match Accepted ADR-004) | | O
+         -pen |                                                          
+      29 -| REVIEW-US-03-F04 | review | minor | `cms/src/bootstrap/seed-d
+         -ata.ts:256-268` | Country matrix (SPEC-US-03 §3) says the terms
+         - body differs per country: CO mentions "Superintendencia Financ
+         -iera de Colombia (texto de ejemplo)" and CL mentions "Comisión 
+         -para el Mercado Financiero (texto de ejemplo)". The seed uses o
+         -ne shared `TERMS` constant for both countries. So the per-count
+         -ry body in AC-02 is not shown in the seed, and the AC-02 e2e te
+         -st (`us-03-summary-payment.spec.ts:130`) cannot catch a cross-c
+         -ountry body mix-up: only the title differs. This file is outsid
+         -e the commit range but is the seed data that US-03 relies on. |
+         - Give CO and CL distinct fictitious `termsBody` texts as the ma
+         -trix says. Seed changes go under `cms/` on this feat branch, wh
+         -ich the gate allows because the spec is Approved. | fix now | |
+         - Open |                                                        
+      30 -| REVIEW-US-03-F05 | review | minor | `frontend/e2e/us-03-summa
+         -ry-payment.spec.ts:91-112`; `frontend/src/app/features/summary/
+         -summary.spec.ts` | Test gaps and weak assertions: (1) the test 
+         -mapping lists AC-02 as "e2e + unit", but there is no `US-03-AC-
+         -02` unit test (the test-writer confirmed this). (2) In the AC-0
+         -1 e2e test, `draftOnlyField` (lines 111-112) is checked against
+         - the **Strapi API response**, not the page, so it is tautologic
+         -al for the UI. (3) AC-01 checks only that each row exists (`row
+         --${key}` visible), not the Strapi label or the displayed value.
+         - AC-01 requires "every … field label and value". | Add a unit t
+         -est `US-03-AC-02 terms from Strapi per country gate the pay but
+         -ton` (title/body from the mocked country; pay disabled/enabled 
+         -with the checkbox). Assert that the page has no `row-draftOnlyF
+         -ield`, instead of checking the API. Assert each row's `dt` equa
+         -ls the API `label`, and for at least one non-masked field asser
+         -t the `dd` value. | fix now | | Open |                         
+      26 +| REVIEW-US-03-F01 | test-writer | blocker | `frontend/src/app/
+         +features/summary/summary-guard.ts:9-15` | TW-BUG-01. Reported: 
+         +the guard throws NG0203 "inject() must be called from an inject
+         +ion context"; navigation to `/{cc}/resumen` fails (lands on `/`
+         +), "Continuar" on plans does nothing. Failing: unit `US-03-AC-1
+         +1 summary guard allows entry…` and `…redirects to planes…`; 21 
+         +e2e tests that need the summary (AC-01..08, 10, 12, keyboard fu
+         +ll flow `US-01-AC-12 US-03-AC-20…`), e2e `US-03-AC-11 … (valid 
+         +step 1, no plan)`, and 3 US-02 regressions (US-02-AC-03 co/cl, 
+         +real step 1 form co). Reviewer analysis confirmed: line 9 does 
+         +`await plansGuard(route, state)`, and lines 13-15 then call `in
+         +ject(CountryContext)`, `inject(QuoteStore)`, `inject(Router)`. 
+         +The injection context exists only for the synchronous part of a
+         + functional guard, so every path where step 1 is valid throws. 
+         +The "no wizard state" case passes only because `plansGuard` ret
+         +urns before its own `await` (`plans-guard.ts:22-23`) and `summa
+         +ryGuard` returns at line 11. `plansGuard` itself is correct: it
+         + injects everything first (`plans-guard.ts:12-16`). The `as Gua
+         +rdResult` cast at line 9 also hides that `CanActivateFn` may re
+         +turn an Observable, which `await` would not subscribe to. This 
+         +blocks the P1 ACs AC-01..08, 10, 11 and 12, and US-02-AC-03. | 
+         +Move all `inject()` calls (CountryContext, QuoteStore, Router) 
+         +to the top of `summaryGuard`, before the `await`. Better: extra
+         +ct the step-1 check from `plansGuard` into a plain async functi
+         +on that takes its dependencies as arguments, and call it from b
+         +oth guards so no cast is needed. Re-run the 2 unit guard tests 
+         +and the full US-02/US-03/full-flow e2e suites. | fix now | `0e5
+         +98a7` | Resolved |                                             
+      27 +| REVIEW-US-03-F02 | review | major | `frontend/src/app/feature
+         +s/summary/summary.html:90`, `frontend/src/app/features/summary/
+         +summary.ts:175-179` | You can complete a payment without accept
+         +ing the terms. The checkbox is disabled only when `locked()` (s
+         +tate `processing`) or when terms are unavailable, so it stays e
+         +nabled while the gateway is open (state `gateway`). `simulate()
+         +` checks only `state() === 'gateway'` and never re-checks `acce
+         +pted()`. So: check terms → "Pagar" → uncheck terms → "Simular p
+         +ago aprobado" gives an approved payment and a quote number with
+         + the box unchecked. This defeats the AC-02 / GAP-09 rule that p
+         +ayment is gated by acceptance (§5 "Pay enabled iff checkbox che
+         +cked"). The spec text locks the checkbox only during processing
+         + (GAP-17), but this gap breaks the intent of the gating rule. |
+         + Pick one: (a) in `simulate()`, refuse unless `accepted() && te
+         +rmsAvailable()`; or (b) close the gateway (state → `idle`, focu
+         +s to "Pagar") when the checkbox is unchecked; or (c) also disab
+         +le the checkbox while state is `gateway`. Option (a) plus (b) k
+         +eeps the state-level lock style of GAP-17. Add a unit test (e.g
+         +. under `US-03-AC-02`). If (c) changes visible behavior, check 
+         +whether the spec needs a version bump. | fix now | `7282b88` | 
+         +Resolved |                                                     
+      28 +| REVIEW-US-03-F03 | review | minor | `frontend/src/app/feature
+         +s/summary/summary.ts:198-206` | ADR-004 "Clearing" (`docs/adr/A
+         +DR-004-wizard-state-in-browser.md:54`) requires removing `quote
+         +:v1:{CC}` **before** navigating to confirmation. `approve()` ca
+         +lls `store.clear()` only after `await this.router.navigate(...)
+         +`. The implementer flagged this as a deliberate choice, but it 
+         +contradicts an accepted ADR. Concrete risks: if the navigation 
+         +rejects or is cancelled (e.g. a lazy chunk load fails), `store.
+         +clear()` never runs, so the PII stays in sessionStorage while a
+         + confirmation already sits in `ConfirmationStore`. The summary 
+         +is also left in state `approved` with no pay controls and no me
+         +ssage. | Call `this.store.clear()` before `router.navigate(...)
+         +`. `planUnavailable` already excludes state `approved`, so noth
+         +ing visible breaks. Handle a failed navigation (e.g. reset stat
+         +e, or navigate to `/{cc}/datos`). If the current order is prefe
+         +rred, have the architect amend ADR-004 (HC2) instead of divergi
+         +ng silently. | fix now (code must match Accepted ADR-004) | `d4
+         +50e35` | Resolved |                                            
+      29 +| REVIEW-US-03-F04 | review | minor | `cms/src/bootstrap/seed-d
+         +ata.ts:256-268` | Country matrix (SPEC-US-03 §3) says the terms
+         + body differs per country: CO mentions "Superintendencia Financ
+         +iera de Colombia (texto de ejemplo)" and CL mentions "Comisión 
+         +para el Mercado Financiero (texto de ejemplo)". The seed uses o
+         +ne shared `TERMS` constant for both countries. So the per-count
+         +ry body in AC-02 is not shown in the seed, and the AC-02 e2e te
+         +st (`us-03-summary-payment.spec.ts:130`) cannot catch a cross-c
+         +ountry body mix-up: only the title differs. This file is outsid
+         +e the commit range but is the seed data that US-03 relies on. |
+         + Give CO and CL distinct fictitious `termsBody` texts as the ma
+         +trix says. Seed changes go under `cms/` on this feat branch, wh
+         +ich the gate allows because the spec is Approved. | fix now | `
+         +59fd7d0`, `ebfc6df` | Resolved |                               
+      30 +| REVIEW-US-03-F05 | review | minor | `frontend/e2e/us-03-summa
+         +ry-payment.spec.ts:91-112`; `frontend/src/app/features/summary/
+         +summary.spec.ts` | Test gaps and weak assertions: (1) the test 
+         +mapping lists AC-02 as "e2e + unit", but there is no `US-03-AC-
+         +02` unit test (the test-writer confirmed this). (2) In the AC-0
+         +1 e2e test, `draftOnlyField` (lines 111-112) is checked against
+         + the **Strapi API response**, not the page, so it is tautologic
+         +al for the UI. (3) AC-01 checks only that each row exists (`row
+         +-${key}` visible), not the Strapi label or the displayed value.
+         + AC-01 requires "every … field label and value". | Add a unit t
+         +est `US-03-AC-02 terms from Strapi per country gate the pay but
+         +ton` (title/body from the mocked country; pay disabled/enabled 
+         +with the checkbox). Assert that the page has no `row-draftOnlyF
+         +ield`, instead of checking the API. Assert each row's `dt` equa
+         +ls the API `label`, and for at least one non-masked field asser
+         +t the `dd` value. | fix now | `0fcb455` | Resolved |           
+      31  | REVIEW-US-03-F06 | review | minor | `frontend/src/app/feature
+          s/confirmation/confirmation-guard.ts:10-11`, `frontend/src/app/
+          features/confirmation/confirmation.ts:12-24` | When the country
+           cannot be resolved (Strapi unreachable), `confirmationGuard` r
+          eturns `true` and the Confirmation component renders an empty `
+          <section>`: no h1, no error, no retry. GAP-04 makes loading/err
+          or states with retry mandatory, and GAP-22 says a deep link to
+          `/{cc}/confirmacion` without data redirects to `/{cc}/datos`. I
+          n this state there can never be a confirmation in memory for th
+          e country. | When `country` is null, redirect to `/{route param
+          }/datos` (lowercase `:country` param from the route snapshot),
+          where step 1 already shows its technical error and retry. | acc
+          ept risk: P2 case (AC-18), only when Strapi is down | | Accepte
+          d |
+      32  | REVIEW-US-03-F07 | review | nit | `frontend/src/app/shared/st
+          ep-placeholder.ts:1-14`, `frontend/src/app/app.routes.ts:7`, `f
+          rontend/e2e/full-flow-keyboard.spec.ts:76-77,85` | Dead code an
+          d leftovers: `StepPlaceholder` is no longer referenced by any r
+          oute. The routes comment "Step components are placeholders unti
+          l the features replace them" is now stale. In the keyboard e2e,
+           `chosenName` is computed and then discarded with `void chosenN
+          ame`. The "Continuar" `tabTo` predicate has a redundant cast an
+          d duplicate conditions. | Delete `step-placeholder.ts` and upda
+          te the routes comment. In the e2e, either assert `chosenName` o
+          n the summary (`summary-plan-name`) or remove it, and simplify
+          the predicate to `button('Continuar')`. | accept risk: cosmetic
+           | | Accepted |
+      33  | REVIEW-US-03-F08 | review | nit | `frontend/src/app/features/
+          summary/summary.ts:143-150`, `frontend/src/app/features/confirm
+          ation/confirmation.ts:39-46` | Both components re-implement cop
+          y lookup instead of using the shared `copy()` helper (`frontend
+          /src/app/core/country-config.ts:57`), the same pattern as `Plan
+          List`. Because `text()` is called from the template and from th
+          e `view` computed, a missing key logs `console.warn` on every c
+          hange detection. No PII is logged (keys only). | Use `copy(this
+          .country(), key, fallback)`, or put a single `text()` on a shar
+          ed base/helper. Optionally warn once per key. | accept risk: co
+          smetic, no user impact | | Accepted |
+      34 -| REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/
+         -summary/summary.html:77,79` | The terms `<section aria-labelled
+         -by="terms-title">` and the inner `<div role="region" aria-label
+         -ledby="terms-title">` both form region landmarks with the same 
+         -accessible name, so screen readers announce two "Términos y con
+         -diciones – …" regions. §7 requires the region only on the scrol
+         -lable body. | Drop `aria-labelledby` from the outer `<section>`
+         -, or make it a plain `<div>`, and keep the region on the scroll
+         -able body. | fix now (overrides proposal: accessibility is an e
+         -xplicit requirement and the change is trivial; consistent with 
+         -US-01 F04 and US-02 F02) | | Open |                            
+      34 +| REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/
+         +summary/summary.html:77,79` | The terms `<section aria-labelled
+         +by="terms-title">` and the inner `<div role="region" aria-label
+         +ledby="terms-title">` both form region landmarks with the same 
+         +accessible name, so screen readers announce two "Términos y con
+         +diciones – …" regions. §7 requires the region only on the scrol
+         +lable body. | Drop `aria-labelledby` from the outer `<section>`
+         +, or make it a plain `<div>`, and keep the region on the scroll
+         +able body. | fix now (overrides proposal: accessibility is an e
+         +xplicit requirement and the change is trivial; consistent with 
+         +US-01 F04 and US-02 F02) | `d450e35` (shared with F03)` | Resol
+         +ved |                                                          
+      35 
+      36  ## Test-writer bugs
+      37 
+
+● Agent "F05 tests and US-03 re-run" finished · 2m 2s
+● Python isn't installed, so the F10 row wasn't added, and the F09 cell has a
+  stray backtick. Fixing both with the Edit tool.
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Update(docs\reviews\REVIEW-US-03.md)
+  ⎿  Added 2 lines, removed 1 line
+      31  | REVIEW-US-03-F06 | review | minor | `frontend/src/app/feature
+          s/confirmation/confirmation-guard.ts:10-11`, `frontend/src/app/
+          features/confirmation/confirmation.ts:12-24` | When the country
+           cannot be resolved (Strapi unreachable), `confirmationGuard` r
+          eturns `true` and the Confirmation component renders an empty `
+          <section>`: no h1, no error, no retry. GAP-04 makes loading/err
+          or states with retry mandatory, and GAP-22 says a deep link to
+          `/{cc}/confirmacion` without data redirects to `/{cc}/datos`. I
+          n this state there can never be a confirmation in memory for th
+          e country. | When `country` is null, redirect to `/{route param
+          }/datos` (lowercase `:country` param from the route snapshot),
+          where step 1 already shows its technical error and retry. | acc
+          ept risk: P2 case (AC-18), only when Strapi is down | | Accepte
+          d |
+      32  | REVIEW-US-03-F07 | review | nit | `frontend/src/app/shared/st
+          ep-placeholder.ts:1-14`, `frontend/src/app/app.routes.ts:7`, `f
+          rontend/e2e/full-flow-keyboard.spec.ts:76-77,85` | Dead code an
+          d leftovers: `StepPlaceholder` is no longer referenced by any r
+          oute. The routes comment "Step components are placeholders unti
+          l the features replace them" is now stale. In the keyboard e2e,
+           `chosenName` is computed and then discarded with `void chosenN
+          ame`. The "Continuar" `tabTo` predicate has a redundant cast an
+          d duplicate conditions. | Delete `step-placeholder.ts` and upda
+          te the routes comment. In the e2e, either assert `chosenName` o
+          n the summary (`summary-plan-name`) or remove it, and simplify
+          the predicate to `button('Continuar')`. | accept risk: cosmetic
+           | | Accepted |
+      33  | REVIEW-US-03-F08 | review | nit | `frontend/src/app/features/
+          summary/summary.ts:143-150`, `frontend/src/app/features/confirm
+          ation/confirmation.ts:39-46` | Both components re-implement cop
+          y lookup instead of using the shared `copy()` helper (`frontend
+          /src/app/core/country-config.ts:57`), the same pattern as `Plan
+          List`. Because `text()` is called from the template and from th
+          e `view` computed, a missing key logs `console.warn` on every c
+          hange detection. No PII is logged (keys only). | Use `copy(this
+          .country(), key, fallback)`, or put a single `text()` on a shar
+          ed base/helper. Optionally warn once per key. | accept risk: co
+          smetic, no user impact | | Accepted |
+      34 -| REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/
+         -summary/summary.html:77,79` | The terms `<section aria-labelled
+         -by="terms-title">` and the inner `<div role="region" aria-label
+         -ledby="terms-title">` both form region landmarks with the same 
+         -accessible name, so screen readers announce two "Términos y con
+         -diciones – …" regions. §7 requires the region only on the scrol
+         -lable body. | Drop `aria-labelledby` from the outer `<section>`
+         -, or make it a plain `<div>`, and keep the region on the scroll
+         -able body. | fix now (overrides proposal: accessibility is an e
+         -xplicit requirement and the change is trivial; consistent with 
+         -US-01 F04 and US-02 F02) | `d450e35` (shared with F03)` | Resol
+         -ved |                                                          
+      34 +| REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/
+         +summary/summary.html:77,79` | The terms `<section aria-labelled
+         +by="terms-title">` and the inner `<div role="region" aria-label
+         +ledby="terms-title">` both form region landmarks with the same 
+         +accessible name, so screen readers announce two "Términos y con
+         +diciones – …" regions. §7 requires the region only on the scrol
+         +lable body. | Drop `aria-labelledby` from the outer `<section>`
+         +, or make it a plain `<div>`, and keep the region on the scroll
+         +able body. | fix now (overrides proposal: accessibility is an e
+         +xplicit requirement and the change is trivial; consistent with 
+         +US-01 F04 and US-02 F02) | `d450e35` (shared with F03) | Resolv
+         +ed |                                                           
+      35 +| REVIEW-US-03-F10 | test-writer | minor | `frontend/src/app/fe
+         +atures/summary/summary.ts:158` | TW-BUG-02, found in the fix ro
+         +und as a follow-up to F02. Logged by the main session because t
+         +his cycle has only one review round. The unit test `US-03-AC-02
+         + unchecking terms while the gateway is open blocks approval` fa
+         +ils. After the user unchecks terms with the gateway open, the g
+         +ateway closes and approval is blocked, but `document.activeElem
+         +ent` is `<body>` instead of "Pagar". The handler calls `focusLa
+         +ter(this.payButton)` while "Pagar" is disabled, and `focus()` o
+         +n a disabled button does nothing. Keyboard and screen-reader us
+         +ers lose their place. | Don't move focus to the disabled "Pagar
+         +". Keep focus on the terms checkbox, which the user just operat
+         +ed and which is the only enabled next step. Update the F02 unit
+         + test's focus assertion to match. | | | Open |                 
+      36 
+      37  ## Test-writer bugs
+      38 
+
+● Update(docs\reviews\REVIEW-US-03.md)
+  ⎿  Added 1 line
+      39  | Bug (as reported in the test run summary) | AC | Failing test
+           | Finding ID |
+      40  |-------------------------------------------|----|-------------
+          -|------------|
+      41  | TW-BUG-01: `summaryGuard` calls `inject()` after `await plans
+          Guard(...)` → NG0203; `/{cc}/resumen` unreachable (lands on `/`
+          ), "Continuar" on plans does nothing | US-03-AC-01..08, 10, 11
+          (no-plan case), 12, 20; US-02-AC-03 | `US-03-AC-11 summary guar
+          d allows entry when step 1 is valid and a plan is selected`, `U
+          S-03-AC-11 summary guard redirects to planes when step 1 is val
+          id and no plan is selected` (unit); 22 e2e incl. `US-03-AC-11 …
+           (valid step 1, no plan)`, `US-01-AC-12 US-03-AC-20 completes t
+          he full Colombia flow with keyboard only`, US-02-AC-03 co/cl |
+          REVIEW-US-03-F01 |
+      42 +| TW-BUG-02 (fix round): after the user unchecks terms while th
+         +e gateway is open, focus lands on `<body>` because `focus()` is
+         + called on the disabled "Pagar" | US-03-AC-02 | `US-03-AC-02 un
+         +checking terms while the gateway is open blocks approval` (unit
+         +) | REVIEW-US-03-F10 |                                         
+      43 
+      44  ## Spec conformance
+      45 
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Five of the six fixes are done and verified. F02's fix caused one new bug,
+  which needs your decision before I can go to HC4.
+
+  Test results
+  - e2e: 40 of 40 pass on Docker at 127.0.0.1:4200. That includes the
+    keyboard-only Colombia flow, which passed in 5.2 s, and the US-01, US-02 and
+    AC-22 tests.
+  - Unit: 110 of 111 pass. The failure is a new test-writer bug, TW-BUG-02.
+  - Review report: F01–F05 and F09 are Resolved with their commits; F09 shares
+    d450e35 with F03. Committed in 0a940a1.
+
+  HC3: one new finding
+
+  ID: F10
+  Sev: minor
+  Finding: (TW-BUG-02, a follow-up to the F02 fix) When terms are unchecked
+    while the gateway is open, focus goes to the page body. The code tries to
+    focus "Pagar", which is disabled at that moment, so the focus call does
+    nothing.
+  Proposal: fix: leave focus on the terms checkbox and update the test. It's a
+    one-line accessibility fix, in line with your F09 decision.
+
+  Still open: to get the new per-country terms text into Strapi, may I run
+  docker compose down -v and rebuild? This deletes the Strapi data volume,
+  including any admin account or content you created by hand. The other option
+  is that you edit termsBody for CO and CL in the Strapi admin yourself.
+
+  Please reply with your F10 decision and reset or manual edit. After that comes
+  the F10 fix (if you choose fix), then the rebuild and the HC4 checklist.
+
+> F10: fix (one-line accessibility fix, consistent with F09).
+  Reset: yes, run docker compose down -v and rebuild. It also proves the seed
+  works from a clean state, which is what the evaluator will do. I will
+  recreate the admin user with fictitious data.
+  Then go to HC4.
+
+● Bash(sed -i "/^| REVIEW-US-03-F10 |/s/| | | Open |\$/| fix now (one-line
+      accessibility fix, consistent with F09) | | Open |/"
+      docs/reviews/REVIEW-US-03.md && grep -c…)
+  ⎿  Updated docs\reviews\REVIEW-US-03.md +1 -1
+      32  | REVIEW-US-03-F07 | review | nit | `frontend/src/app/shared/st
+          ep-placeholder.ts:1-14`, `frontend/src/app/app.routes.ts:7`, `f
+          rontend/e2e/full-flow-keyboard.spec.ts:76-77,85` | Dead code an
+          d leftovers: `StepPlaceholder` is no longer referenced by any r
+          oute. The routes comment "Step components are placeholders unti
+          l the features replace them" is now stale. In the keyboard e2e,
+           `chosenName` is computed and then discarded with `void chosenN
+          ame`. The "Continuar" `tabTo` predicate has a redundant cast an
+          d duplicate conditions. | Delete `step-placeholder.ts` and upda
+          te the routes comment. In the e2e, either assert `chosenName` o
+          n the summary (`summary-plan-name`) or remove it, and simplify
+          the predicate to `button('Continuar')`. | accept risk: cosmetic
+           | | Accepted |
+      33  | REVIEW-US-03-F08 | review | nit | `frontend/src/app/features/
+          summary/summary.ts:143-150`, `frontend/src/app/features/confirm
+          ation/confirmation.ts:39-46` | Both components re-implement cop
+          y lookup instead of using the shared `copy()` helper (`frontend
+          /src/app/core/country-config.ts:57`), the same pattern as `Plan
+          List`. Because `text()` is called from the template and from th
+          e `view` computed, a missing key logs `console.warn` on every c
+          hange detection. No PII is logged (keys only). | Use `copy(this
+          .country(), key, fallback)`, or put a single `text()` on a shar
+          ed base/helper. Optionally warn once per key. | accept risk: co
+          smetic, no user impact | | Accepted |
+      34  | REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/
+          summary/summary.html:77,79` | The terms `<section aria-labelled
+          by="terms-title">` and the inner `<div role="region" aria-label
+          ledby="terms-title">` both form region landmarks with the same
+          accessible name, so screen readers announce two "Términos y con
+          diciones – …" regions. §7 requires the region only on the scrol
+          lable body. | Drop `aria-labelledby` from the outer `<section>`
+          , or make it a plain `<div>`, and keep the region on the scroll
+          able body. | fix now (overrides proposal: accessibility is an e
+          xplicit requirement and the change is trivial; consistent with
+          US-01 F04 and US-02 F02) | `d450e35` (shared with F03) | Resolv
+          ed |
+      35 -| REVIEW-US-03-F10 | test-writer | minor | `frontend/src/app/fe
+         -atures/summary/summary.ts:158` | TW-BUG-02, found in the fix ro
+         -und as a follow-up to F02. Logged by the main session because t
+         -his cycle has only one review round. The unit test `US-03-AC-02
+         - unchecking terms while the gateway is open blocks approval` fa
+         -ils. After the user unchecks terms with the gateway open, the g
+         -ateway closes and approval is blocked, but `document.activeElem
+         -ent` is `<body>` instead of "Pagar". The handler calls `focusLa
+         -ter(this.payButton)` while "Pagar" is disabled, and `focus()` o
+         -n a disabled button does nothing. Keyboard and screen-reader us
+         -ers lose their place. | Don't move focus to the disabled "Pagar
+         -". Keep focus on the terms checkbox, which the user just operat
+         -ed and which is the only enabled next step. Update the F02 unit
+         - test's focus assertion to match. | | | Open |                 
+      35 +| REVIEW-US-03-F10 | test-writer | minor | `frontend/src/app/fe
+         +atures/summary/summary.ts:158` | TW-BUG-02, found in the fix ro
+         +und as a follow-up to F02. Logged by the main session because t
+         +his cycle has only one review round. The unit test `US-03-AC-02
+         + unchecking terms while the gateway is open blocks approval` fa
+         +ils. After the user unchecks terms with the gateway open, the g
+         +ateway closes and approval is blocked, but `document.activeElem
+         +ent` is `<body>` instead of "Pagar". The handler calls `focusLa
+         +ter(this.payButton)` while "Pagar" is disabled, and `focus()` o
+         +n a disabled button does nothing. Keyboard and screen-reader us
+         +ers lose their place. | Don't move focus to the disabled "Pagar
+         +". Keep focus on the terms checkbox, which the user just operat
+         +ed and which is the only enabled next step. Update the F02 unit
+         + test's focus assertion to match. | fix now (one-line accessibi
+         +lity fix, consistent with F09) | | Open |                      
+      36 
+      37  ## Test-writer bugs
+      38 
+
+● implementer(Fix US-03 F10 focus)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● I've recorded the F10 decision, and the implementer is applying the focus fix.
+  When it's done I'll reset the volumes, rebuild, and run the tests on the
+  clean stack.
+
+› Message from implementer
+  REVIEW-US-03-F10 is fixed in commit dc2e46e: `fix(US-03): keep focus on terms
+  checkbox when closing gateway (REVIEW-US-03-F10)`. The commit has the `Refs`
+  and `Co-Authored-By` trailers you specified. `ng build` succeeds and the full
+  unit suite passes (12 files, 111 of 111 tests).
+
+  - **Fix:** in `frontend/src/app/features/summary/summary.ts`, `setAccepted` no
+  longer calls `focusLater(this.payButton)` when the terms box is unchecked
+  while the gateway is open. The gateway still closes, and focus stays on the
+  checkbox the user just operated. I added a one-line comment explaining why.
+  - **Test:** in `frontend/src/app/features/summary/summary.spec.ts`, the
+  `US-03-AC-02 unchecking terms while the gateway is open blocks approval` test
+  now expects `document.activeElement` to be the terms checkbox. The `// BUG:
+  TW-BUG-02` comment is removed.
+  - **One extra line in the test:** I added `box.focus()` just before the
+  uncheck click, with a comment. A synthetic `click()` in jsdom doesn't move
+  focus, so without it the assertion failed. A real user click does focus the
+  checkbox. Nothing else in the test changed.
+
+  Only those two files were committed. The spec was not touched.
+
+● F10 is fixed in dc2e46e and all 111 unit tests pass. Now the reset you
+  approved: removing volumes and rebuilding both images.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Agent "Fix US-03 F10 focus" finished · 52s
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The clean seed has distinct CO and CL terms texts. Running the final
+  test-writer pass on the clean stack.
+
+● test-writer(Final US-03 test re-run)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● Record F10 resolution meanwhile.
+
+● Bash(sed -i "/^| REVIEW-US-03-F10 |/s/| | Open |\$/| \`dc2e46e\` | Resolved
+      |/" docs/reviews/REVIEW-US-03.md && grep -c "dc2e46e"
+      docs/reviews/REVIEW-US-03.md && git…)
+  ⎿  Updated docs\reviews\REVIEW-US-03.md +1 -1
+      32  | REVIEW-US-03-F07 | review | nit | `frontend/src/app/shared/st
+          ep-placeholder.ts:1-14`, `frontend/src/app/app.routes.ts:7`, `f
+          rontend/e2e/full-flow-keyboard.spec.ts:76-77,85` | Dead code an
+          d leftovers: `StepPlaceholder` is no longer referenced by any r
+          oute. The routes comment "Step components are placeholders unti
+          l the features replace them" is now stale. In the keyboard e2e,
+           `chosenName` is computed and then discarded with `void chosenN
+          ame`. The "Continuar" `tabTo` predicate has a redundant cast an
+          d duplicate conditions. | Delete `step-placeholder.ts` and upda
+          te the routes comment. In the e2e, either assert `chosenName` o
+          n the summary (`summary-plan-name`) or remove it, and simplify
+          the predicate to `button('Continuar')`. | accept risk: cosmetic
+           | | Accepted |
+      33  | REVIEW-US-03-F08 | review | nit | `frontend/src/app/features/
+          summary/summary.ts:143-150`, `frontend/src/app/features/confirm
+          ation/confirmation.ts:39-46` | Both components re-implement cop
+          y lookup instead of using the shared `copy()` helper (`frontend
+          /src/app/core/country-config.ts:57`), the same pattern as `Plan
+          List`. Because `text()` is called from the template and from th
+          e `view` computed, a missing key logs `console.warn` on every c
+          hange detection. No PII is logged (keys only). | Use `copy(this
+          .country(), key, fallback)`, or put a single `text()` on a shar
+          ed base/helper. Optionally warn once per key. | accept risk: co
+          smetic, no user impact | | Accepted |
+      34  | REVIEW-US-03-F09 | review | nit | `frontend/src/app/features/
+          summary/summary.html:77,79` | The terms `<section aria-labelled
+          by="terms-title">` and the inner `<div role="region" aria-label
+          ledby="terms-title">` both form region landmarks with the same
+          accessible name, so screen readers announce two "Términos y con
+          diciones – …" regions. §7 requires the region only on the scrol
+          lable body. | Drop `aria-labelledby` from the outer `<section>`
+          , or make it a plain `<div>`, and keep the region on the scroll
+          able body. | fix now (overrides proposal: accessibility is an e
+          xplicit requirement and the change is trivial; consistent with
+          US-01 F04 and US-02 F02) | `d450e35` (shared with F03) | Resolv
+          ed |
+      35 -| REVIEW-US-03-F10 | test-writer | minor | `frontend/src/app/fe
+         -atures/summary/summary.ts:158` | TW-BUG-02, found in the fix ro
+         -und as a follow-up to F02. Logged by the main session because t
+         -his cycle has only one review round. The unit test `US-03-AC-02
+         - unchecking terms while the gateway is open blocks approval` fa
+         -ils. After the user unchecks terms with the gateway open, the g
+         -ateway closes and approval is blocked, but `document.activeElem
+         -ent` is `<body>` instead of "Pagar". The handler calls `focusLa
+         -ter(this.payButton)` while "Pagar" is disabled, and `focus()` o
+         -n a disabled button does nothing. Keyboard and screen-reader us
+         -ers lose their place. | Don't move focus to the disabled "Pagar
+         -". Keep focus on the terms checkbox, which the user just operat
+         -ed and which is the only enabled next step. Update the F02 unit
+         - test's focus assertion to match. | fix now (one-line accessibi
+         -lity fix, consistent with F09) | | Open |                      
+      35 +| REVIEW-US-03-F10 | test-writer | minor | `frontend/src/app/fe
+         +atures/summary/summary.ts:158` | TW-BUG-02, found in the fix ro
+         +und as a follow-up to F02. Logged by the main session because t
+         +his cycle has only one review round. The unit test `US-03-AC-02
+         + unchecking terms while the gateway is open blocks approval` fa
+         +ils. After the user unchecks terms with the gateway open, the g
+         +ateway closes and approval is blocked, but `document.activeElem
+         +ent` is `<body>` instead of "Pagar". The handler calls `focusLa
+         +ter(this.payButton)` while "Pagar" is disabled, and `focus()` o
+         +n a disabled button does nothing. Keyboard and screen-reader us
+         +ers lose their place. | Don't move focus to the disabled "Pagar
+         +". Keep focus on the terms checkbox, which the user just operat
+         +ed and which is the only enabled next step. Update the F02 unit
+         + test's focus assertion to match. | fix now (one-line accessibi
+         +lity fix, consistent with F09) | `dc2e46e` | Resolved |        
+      36 
+      37  ## Test-writer bugs
+      38 
+  ⎿  (another command ran in this repository at the same time; a change
+     made by either may show under either result)
+
+● The stack is reset and rebuilt from clean volumes:
+
+  - Seed check: Strapi now serves distinct terms text per country. CO mentions
+    the Superintendencia Financiera, CL the Comisión para el Mercado Financiero.
+  - F10: recorded as resolved in the review report (dc2e46e).
+
+  The test-writer is running the full unit and e2e suites on this clean stack.
+  The HC4 checklist follows when it finishes.
+
+› Message from test-writer
+  US-03 final re-run on feat/US-03-summary-payment (after dc2e46e, against the
+  freshly reseeded Docker stack) is fully green.
+
+  **Unit** (`cd frontend && npm test`, Vitest): 12 files passed, 111 tests
+  passed, 0 failed.
+
+  **E2E** (`E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test`, chromium):
+  40 passed, 0 failed, 0 skipped. That covers smoke, US-01, US-02, US-03, and
+  the public-write 403/401 API tests (US-01-AC-15, US-02-AC-19, US-03-AC-22).
+
+  **Keyboard full-flow test:** `US-01-AC-12 US-03-AC-20 completes the full
+  Colombia flow with keyboard only` (`full-flow-keyboard.spec.ts:28`) PASSED in
+  4.8s.
+
+  **Failures:** none.
+
+  **TW-BUGs:** none.
+
+  I changed no production code or tests, and committed nothing. The only
+  untracked files are the pre-existing `docs/ai-sessions/*` entries. I started
+  no dev server.
+
+● Everything is green on the clean stack. Before HC4, I'm checking the README's
+  pending list, since untested P2 items have to be listed there.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Agent "Final US-03 test re-run" finished · 37s
+
+● Update(README.md)
+  ⎿  Added 8 lines
+       94  | US-02-AC-11 (selection kept on return and reload) | Pending
+           manual check. |
+       95  | US-02-AC-20 (focus on arrival) | Pending manual check. |
+       96  | US-02-AC-21 (responsive layout) | Pending manual check. |
+       97 +| US-03-AC-13 (summary error state with retry when Strapi fail
+          +s) | Pending manual check. Implemented. |                     
+       98 +| US-03-AC-15 (selected plan no longer available shows "Cambia
+          +r plan") | Pending manual check. Implemented. |               
+       99 +| US-03-AC-16 (option labels, locale dates, empty optional fie
+          +lds omitted) | Pending manual check. Implemented. |           
+      100 +| US-03-AC-17 (terms acceptance resets on re-entry) | Pending 
+          +manual check. Implemented. |                                  
+      101 +| US-03-AC-18 (confirmation without data redirects to step 1) 
+          +| Pending manual check. Implemented. When Strapi is down, the 
+          +confirmation page renders empty (REVIEW-US-03-F06, accepted ri
+          +sk). |                                                        
+      102 +| US-03-AC-19 (cancel closes the gateway and returns focus) | 
+          +Pending manual check. Implemented. |                          
+      103 +| US-03-AC-20 (payment with keyboard only) | Automated for CO:
+          + `US-01-AC-12 US-03-AC-20 completes the full Colombia flow wit
+          +h keyboard only`. CL pending manual check. |                  
+      104 +| US-03-AC-21 (summary fits a 360px viewport) | Pending manual
+          + check. |                                                     
+      105 
+      106  ## Requirements not met
+      107 
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● HC4: US-03 is ready for your check
+
+  Every finding has your decision: F01–F05, F09 and F10 are fixed with their
+  commits recorded, and F06–F08 are accepted. Tests are green on a stack rebuilt
+  from wiped volumes (down -v), so the seed is proven from a clean state:
+  - Unit tests: 111 of 111 pass.
+  - E2E tests: 40 of 40 pass on 127.0.0.1:4200. This includes the keyboard-only
+    Colombia flow, which passed in 4.8 s, and the test that a public write to
+    Strapi is denied (AC-22).
+  - README: the P2 criteria without automated tests are listed as "pending
+    manual check" (a2e91a5).
+
+  Strapi was reset, so recreate the admin user first. Then open
+  http://127.0.0.1:4200 (not localhost, where a stray dev server answers):
+
+  1. Summary, CO and CL: fill /co/datos, pick a plan and continue. The summary
+     shows the policyholder, vehicle and plan with a price in the country's
+     format, and the document is masked except its last 4 characters. Repeat on
+     /cl/datos.
+  2. Terms per country: CO mentions the Superintendencia Financiera, CL the
+     Comisión para el Mercado Financiero. "Pagar" stays disabled until the box
+     is checked.
+  3. Approved payment: "Pagar", then "Simular pago aprobado". The controls lock,
+     then the confirmation shows a quote number like COT-CO-YYYYMMDD-XXXXXX
+     (COT-CL-… on Chile). Pressing Back sends you to /datos, not the summary.
+  4. Rejected payment: "Simular pago rechazado" shows an alert. The data and the
+     checked box are kept and "Pagar" works again.
+  5. Edit links: "Editar datos" returns to step 1 with your values filled in.
+     "Cambiar plan" returns to the plans with your current plan selected.
+  6. F02 and F10: check the box, press "Pagar", then uncheck it. The gateway
+     closes and focus stays on the checkbox.
+  7. Guard: in a new tab, opening /cl/resumen directly takes you to /cl/datos.
+  8. Keyboard only on Chile: complete the whole Chile flow with Tab, Space and
+     Enter. Colombia is already covered by the automated test.
+
+  Reply APPROVED or REJECTED: <reason>.
+
+> APPROVED (ready for QA). I verified the 8 checklist items manually, including
+  the full keyboard-only flow in Chile, after recreating the admin on the
+  clean stack. Merge into main and push.
+
+● Recording the HC4 sign-off the same way as US-02, then merging.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● Update(README.md)
+  ⎿  Added 2 lines
+      79  | Missing Strapi copy for `form.title`, `form.intro`, `form.emp
+          ty` or `common.continue` renders empty text, and the missing-ke
+          y warning is logged on every change-detection pass (REVIEW-US-0
+          1-F09). | Low: the seed defines all keys; affects only misconfi
+          gured content. | Accepted (Andres Beltran, 2026-11-23, HC3 US-0
+          1). | Technical fallbacks for those keys; warn once per key. |
+      80  | Plan prices are recomputed in the template on every change-de
+          tection pass; when the vehicle year is unavailable, the factor-
+          1 warning (and any missing-copy warning) is logged repeatedly (
+          REVIEW-US-02-F03). | Low: console noise only; prices are correc
+          t. | Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Comput
+          e priced plans once in a `computed`; warn once. |
+      81  | The plans step fetches `/form-fields` twice (guard + componen
+          t), and if only `/form-fields` fails the whole plan list shows
+          the error state instead of falling back to factor 1.00 (REVIEW-
+          US-02-F04). | Low: rare failure case; "Reintentar" recovers. |
+          Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Cache form
+          fields per country and map a fields failure to "no vehicle year
+          ". |
+      82 +| When Strapi is unreachable, `/{cc}/confirmacion` renders an e
+         +mpty page (no heading, error or retry) instead of redirecting t
+         +o step 1 (REVIEW-US-03-F06). | Low: Strapi-down only; no confir
+         +mation can exist in that state. | Accepted (Andres Beltran, 202
+         +6-11-23, HC3 US-03). | When the country is null, redirect to `/
+         +{route param}/datos`. |                                        
+      83 +| The summary and confirmation duplicate the copy lookup instea
+         +d of the shared `copy()` helper, so a missing copy key is logge
+         +d on every change-detection pass (REVIEW-US-03-F08). The unused
+         + `StepPlaceholder` and a stale routes comment remain (REVIEW-US
+         +-03-F07). | Low: cosmetic, no user impact. | Accepted (Andres B
+         +eltran, 2026-11-23, HC3 US-03). | Use `copy()`; delete `step-pl
+         +aceholder.ts`. |                                               
+      84 
+      85  ## Manual checks (P2 without automated test)
+      86 
+
+● Update(README.md)  ⎿  Added 1 line, removed 1 line
+      102  | US-03-AC-17 (terms acceptance resets on re-entry) | Pending
+           manual check. Implemented. |
+      103  | US-03-AC-18 (confirmation without data redirects to step 1)
+           | Pending manual check. Implemented. When Strapi is down, the
+           confirmation page renders empty (REVIEW-US-03-F06, accepted ri
+           sk). |
+      104  | US-03-AC-19 (cancel closes the gateway and returns focus) |
+           Pending manual check. Implemented. |
+      105 -| US-03-AC-20 (payment with keyboard only) | Automated for CO:
+          - `US-01-AC-12 US-03-AC-20 completes the full Colombia flow wit
+          -h keyboard only`. CL pending manual check. |                  
+      105 +| US-03-AC-20 (payment with keyboard only) | Automated for CO:
+          + `US-01-AC-12 US-03-AC-20 completes the full Colombia flow wit
+          +h keyboard only`. CL verified manually at HC4 (full keyboard-o
+          +nly flow in Chile), Andres Beltran, 2026-11-23. |             
+      106  | US-03-AC-21 (summary fits a 360px viewport) | Pending manual
+            check. |
+      107 
+      108  ## Requirements not met
+
+● Bash(git add README.md && git commit -q -F - <<'EOF'
+      docs(US-03): record HC4 sign-off, accepted risks and manual checks…)
+  ⎿  Updated .claude\agents\reviewer.md +50 -51
+  ⎿  Updated .claude\skills\angular-conventions\SKILL.md -15
+  ⎿  Updated FLOW.md -1
+  ⎿  Updated README.md -10
+  ⎿  Deleted docs\reviews\REVIEW-US-03.md -85
+  ⎿  … +19 files changed
+     cms\src\bootstrap\seed-data.ts
+     docs\reviews\US-03.diff
+     frontend\e2e\full-flow-keyboard.spec.ts
+     +16 more
+  ⎿  (a git step in this command can move the working tree, so these may be
+     its changes, not edits) (ctrl+o to expand)
+
+● git merge doesn't accept -F -, so the merge didn't happen. Main is unchanged
+  and only the feature branch was pushed. Retrying with a message file.
+
+● Bash(git log --oneline -1 feat/US-03-summary-payment;
+      M="C:/Users/abelt/AppData/Local/Temp/claude/f559641e098c878a/25ebac23-91ff
+      -4f9f-bf0f-8b5fbc3c10ed/scratchpad/me…)
+  ⎿  Updated .claude\agents\reviewer.md +1
+  ⎿  Updated .claude\skills\angular-conventions\SKILL.md +15
+  ⎿  Updated FLOW.md +1
+  ⎿  Updated README.md +10
+  ⎿  Updated cms\src\bootstrap\seed-data.ts +7 -4
+  ⎿  … +19 files changed
+     docs\reviews\REVIEW-US-03.md
+     docs\reviews\US-03.diff
+     frontend\e2e\full-flow-keyboard.spec.ts
+     +16 more
+  ⎿  (a git step in this command can move the working tree, so these may be
+     its changes, not edits) (ctrl+o to expand)
+
+● US-03 is merged into main as 4f969ef ("merge(US-03): Summary and payment —
+  ready for QA") and pushed, and feat/US-03-summary-payment is pushed too.
+
+  - Sign-off record: committed in 1dbaf06. It covers your HC4 approval, the
+    accepted risks F06–F08 under "Known risks" in the README, and the
+    keyboard-only check you did in Chile.
+  - Final test state: 111 of 111 unit tests and 40 of 40 e2e tests pass on the
+    clean stack, including the keyboard-only Colombia flow.
+
+  Still for you:
+  1. Stop the test-writer's dev server on port 4300 if it's still running.
+  2. Run /export and save it as docs/ai-sessions/2026-11-23-US-03.txt, then copy
+     the raw transcripts and run the email and secret scans described in
+     CLAUDE.md before committing. The US-01 and US-02 export files and a raw
+     folder in docs/ai-sessions/ are also still uncommitted.
