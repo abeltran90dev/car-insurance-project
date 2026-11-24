@@ -12,6 +12,7 @@
 | Reviewer | reviewer subagent (Claude Code, opus), read-only |
 | Review date | 2026-11-23 |
 | Human triage (HC3) | Andres Beltran, 2026-11-23 |
+| HC4 sign-off | APPROVED (ready for QA), Andres Beltran, 2026-11-23. Checklist verified manually in CO and CL, incl. AC-21 (320 px) and a live Strapi field-order change reflected after reload (AC-03). |
 
 ## Findings
 

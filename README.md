@@ -76,6 +76,13 @@ TODO: Public role permissions and their justification; no tokens in the browser.
 | Risk | Impact | Status | Proposed fix |
 |------|--------|--------|--------------|
 | Anonymous `GET /api/<type>?status=draft` returns **draft** entries (verified on Strapi 5.63): any Public `find` permission honors the `status` parameter. The app never sends it, so drafts never reach the UI, but a direct caller can read unpublished content. | Low: unpublished business content (fields, plans), no personal data. | Accepted for now (Andres Beltran, 2026-11-23, Phase 2 checkpoint). Fixed if time remains. | A global Strapi middleware that forces `status=published` on unauthenticated `/api` requests, plus a test in `cms/tests/` proving `?status=draft` returns no drafts. |
+| Missing Strapi copy for `form.title`, `form.intro`, `form.empty` or `common.continue` renders empty text, and the missing-key warning is logged on every change-detection pass (REVIEW-US-01-F09). | Low: the seed defines all keys; affects only misconfigured content. | Accepted (Andres Beltran, 2026-11-23, HC3 US-01). | Technical fallbacks for those keys; warn once per key. |
+
+## Manual checks (P2 without automated test)
+
+| AC | How verified |
+|----|--------------|
+| US-01-AC-21 (small screens, 320 px) | Manually at HC4 in CO and CL (Andres Beltran, 2026-11-23). |
 
 ## Requirements not met
 
