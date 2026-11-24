@@ -89,6 +89,21 @@ frontend/e2e/  Playwright specs
 - Unit tests run on **Vitest**, the Angular CLI default (`@angular/build:unit-test` builder) ([testing](https://angular.dev/guide/testing)). TestBed is zoneless by default.
 - Test pure functions directly (mapper, validators, price rule, mask). Test components through the DOM with roles and labels. Mock HTTP with `provideHttpClientTesting`.
 - E2E with Playwright against the seeded stack. Test names start with the AC ID.
+- **Async functional guards/resolvers need a unit test for every path that crosses an `await`.** The §6 rule (`inject()` before the first `await`) was in this skill and was still broken in US-03 (REVIEW-US-03-F01). The existing tests never ran the guard, and the early-return path doesn't reach the `await`, so a guard can look fine and still throw NG0203 for real users. Pattern:
+  ```ts
+  // Run the guard exactly as the router does: inside an injection context, then await the result.
+  const run = (url: string) =>
+    TestBed.runInInjectionContext(() =>
+      summaryGuard(routeFor(url), { url } as RouterStateSnapshot),
+    ) as Promise<GuardResult>;
+
+  it('US-03-AC-11 allows entry when step 1 is valid and a plan is selected', async () => {
+    seedStore({ values: validStep1, planDocumentId: 'p1' }); // state that makes the guard go past its first await
+    httpMock(...);                                             // let the awaited fetch resolve
+    expect(await run('/co/resumen')).toBe(true);               // NG0203 would reject here
+  });
+  ```
+  Cover at least: (1) the early-redirect path, (2) every path that continues after the `await` (allow and each redirect). Assert the returned `UrlTree` with `router.serializeUrl(result)`. A guard that composes another guard (`await otherGuard(...)`) must take its dependencies up front; prefer extracting the shared check into a plain async function that receives them as arguments.
 
 ## 9. Accessibility checklist (every step)
 
