@@ -1,0 +1,1009 @@
+# US-02 review input  base=0027b6986d71fd7918c7b509de36ba299acf43fa head=6952188d769ecd6d14db1b3b6c22109c140a2370
+## Commits
+6952188 test(US-02): P1 unit and e2e tests for plan list
+a4c7483 feat(US-02): plan list step with selection and states
+43e7955 feat(US-02): guard plans step on valid step 1 data
+e4a233f feat(US-02): add pricing function, plan model and plans API
+## Changed files
+A	frontend/e2e/us-02-plan-list.spec.ts
+M	frontend/src/app/app.routes.ts
+A	frontend/src/app/features/plan-list/plan-list-api.ts
+A	frontend/src/app/features/plan-list/plan-list.css
+A	frontend/src/app/features/plan-list/plan-list.html
+A	frontend/src/app/features/plan-list/plan-list.spec.ts
+A	frontend/src/app/features/plan-list/plan-list.ts
+A	frontend/src/app/features/plan-list/plan.ts
+A	frontend/src/app/features/plan-list/plans-guard.ts
+A	frontend/src/app/features/plan-list/pricing.ts
+## Diff
+diff --git a/frontend/e2e/us-02-plan-list.spec.ts b/frontend/e2e/us-02-plan-list.spec.ts
+new file mode 100644
+index 0000000..17c5818
+--- /dev/null
++++ b/frontend/e2e/us-02-plan-list.spec.ts
+@@ -0,0 +1,171 @@
++import { expect, Page, test } from '@playwright/test';
++
++// Plan names below are seed data (cms seed), as listed in SPEC-US-02 AC-01.
++const SEED_PLANS: Record<string, string[]> = {
++  co: ['Plan Básico', 'Plan Estándar', 'Plan Premium'],
++  cl: ['Plan Esencial', 'Plan Full', 'Plan Full Plus'],
++};
++
++const year = new Date().getFullYear() - 2;
++
++// Fictitious, valid step 1 values per country (keys come from the seeded form configuration).
++const STEP1: Record<string, Record<string, string | number | boolean>> = {
++  co: {
++    documentType: 'CC',
++    documentNumber: '1111111111',
++    firstName: 'Ana',
++    lastName: 'Prueba',
++    birthDate: '1990-01-15',
++    email: 'ana.prueba@example.test',
++    phone: '3001234567',
++    city: 'bogota',
++    acceptDataPolicy: true,
++    plate: 'ABC123',
++    brand: 'toyota',
++    model: 'Modelo Uno',
++    year,
++    mileage: 12000,
++  },
++  cl: {
++    firstName: 'Luis',
++    lastName: 'Prueba',
++    documentNumber: '11.111.111-1',
++    birthDate: '1990-01-15',
++    phone: '912345678',
++    email: 'luis.prueba@example.test',
++    city: 'santiago',
++    plate: 'ABCD12',
++    year,
++    brand: 'toyota',
++    model: 'Modelo Uno',
++    mileage: 12000,
++  },
++};
++
++/** Seeds a completed step 1 (ADR-004 storage shape) before the app boots; only if nothing is stored yet. */
++async function seedStep1(page: Page, cc: string, planDocumentId: string | null = null) {
++  const key = `quote:v1:${cc.toUpperCase()}`;
++  const value = JSON.stringify({ v: 1, country: cc.toUpperCase(), values: STEP1[cc], planDocumentId });
++  await page.addInitScript(
++    ([k, v]) => {
++      if (sessionStorage.getItem(k) === null) sessionStorage.setItem(k, v);
++    },
++    [key, value],
++  );
++}
++
++const cards = (page: Page) => page.locator('[data-testid="plan-card"]');
++const continueBtn = (page: Page) => page.getByRole('button', { name: 'Continuar' });
++
++test.describe('US-02 plan list (e2e)', () => {
++  for (const cc of ['co', 'cl']) {
++    test(`US-02-AC-01 shows only active published plans in order (${cc})`, async ({ page }) => {
++      await seedStep1(page, cc);
++      await page.goto(`/${cc}/planes`);
++      await expect(cards(page).first()).toBeVisible();
++      await expect(page.locator('.plan__name')).toHaveText(SEED_PLANS[cc]);
++      await expect(page.getByText('Plan Antiguo')).toHaveCount(0);
++      await expect(page.getByText('Plan Borrador')).toHaveCount(0);
++    });
++
++    test(`US-02-AC-02 highlights the recommended plan (${cc})`, async ({ page, request }) => {
++      await seedStep1(page, cc);
++      const api = await (
++        await request.get(
++          `/api/plans?filters[country][code][$eq]=${cc.toUpperCase()}&filters[recommended][$eq]=true&filters[active][$eq]=true`,
++        )
++      ).json();
++      const recommendedName: string = api.data[0].name;
++      await page.goto(`/${cc}/planes`);
++      await expect(cards(page).first()).toBeVisible();
++      const badges = page.locator('[data-testid="plan-badge"]');
++      await expect(badges).toHaveCount(1);
++      await expect(badges).toHaveText('Recomendado'); // seed copy "plans.recommendedBadge"
++      const recommendedCard = cards(page).filter({ hasText: recommendedName });
++      await expect(recommendedCard.locator('[data-testid="plan-badge"]')).toHaveCount(1);
++      // Badge is part of that radio's accessible description.
++      const radio = page.getByRole('radio', { name: recommendedName, exact: true });
++      await expect(radio).toHaveAccessibleDescription(/Recomendado/);
++    });
++
++    test(`US-02-AC-03 selects a plan and continues to summary (${cc})`, async ({ page }) => {
++      await seedStep1(page, cc);
++      await page.goto(`/${cc}/planes`);
++      const target = SEED_PLANS[cc][2];
++      await expect(cards(page).first()).toBeVisible();
++      await expect(continueBtn(page)).toBeDisabled();
++      await page.getByRole('radio', { name: target, exact: true }).check();
++      await expect(page.getByRole('radio', { name: target, exact: true })).toBeChecked();
++      await expect(page.locator('.plan--selected')).toContainText(target);
++      await expect(continueBtn(page)).toBeEnabled();
++      await continueBtn(page).click();
++      await expect(page).toHaveURL(new RegExp(`/${cc}/resumen$`));
++    });
++  }
++
++  test('US-02-AC-03 selects a plan after completing the real step 1 form (co)', async ({ page }) => {
++    await page.goto('/co/datos');
++    await expect(page.locator('div.field[data-field="documentNumber"]')).toBeVisible();
++    await page.locator('#field-documentType').selectOption('CC');
++    await page.locator('#field-documentNumber').fill('1111111111');
++    await page.locator('#field-firstName').fill('Ana');
++    await page.locator('#field-lastName').fill('Prueba');
++    await page.locator('#field-birthDate').fill('1990-01-15');
++    await page.locator('#field-email').fill('ana.prueba@example.test');
++    await page.locator('#field-phone').fill('3001234567');
++    await page.locator('#field-city').selectOption('bogota');
++    await page.locator('#field-acceptDataPolicy').check();
++    await page.locator('#field-plate').fill('ABC123');
++    await page.locator('#field-brand').selectOption('toyota');
++    await page.locator('#field-model').fill('Modelo Uno');
++    await page.locator('#field-year').fill(String(year));
++    await page.locator('#field-mileage').fill('12000');
++    await page.locator('button[type=submit]').click();
++    await expect(page).toHaveURL(/\/co\/planes$/);
++    await page.getByRole('radio', { name: SEED_PLANS['co'][1], exact: true }).check();
++    await continueBtn(page).click();
++    await expect(page).toHaveURL(/\/co\/resumen$/);
++  });
++
++  test('US-02-AC-04 shows empty state when no plans (co, mocked)', async ({ page }) => {
++    await seedStep1(page, 'co');
++    await page.route('**/api/plans*', (route) =>
++      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [], meta: {} }) }),
++    );
++    await page.goto('/co/planes');
++    await expect(page.locator('[data-testid="plans-empty"]')).toBeVisible();
++    await expect(page.locator('[data-testid="plans-empty"]')).toHaveText('Por ahora no hay planes disponibles para tu país.');
++    await expect(page.getByRole('radio')).toHaveCount(0);
++    await expect(continueBtn(page)).toHaveCount(0);
++    await expect(page.getByRole('button', { name: 'Volver' })).toBeVisible();
++  });
++
++  test('US-02-AC-09 disables continue until a plan is selected (co)', async ({ page }) => {
++    await seedStep1(page, 'co');
++    await page.goto('/co/planes');
++    await expect(cards(page).first()).toBeVisible();
++    await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
++    await expect(continueBtn(page)).toBeDisabled();
++  });
++
++  test('US-02-AC-10 redirects to step 1 without valid data (cl)', async ({ page }) => {
++    const planRequests: string[] = [];
++    page.on('request', (r) => {
++      if (r.url().includes('/api/plans')) planRequests.push(r.url());
++    });
++    await page.goto('/cl/planes'); // fresh context: empty sessionStorage
++    await expect(page).toHaveURL(/\/cl\/datos$/);
++    await page.waitForLoadState('networkidle');
++    expect(planRequests).toEqual([]);
++  });
++
++  test('US-02-AC-19 public write to plans is denied with 401 or 403', async ({ request }) => {
++    const denied = [401, 403];
++    const planId: string = (await (await request.get('/api/plans?pagination[pageSize]=1')).json()).data[0].documentId;
++    const payload = { data: { name: 'hacked' } };
++    expect(denied).toContain((await request.post('/api/plans', { data: payload })).status());
++    expect(denied).toContain((await request.put(`/api/plans/${planId}`, { data: payload })).status());
++    expect(denied).toContain((await request.delete(`/api/plans/${planId}`)).status());
++    expect((await request.get('/api/plans')).status()).toBe(200);
++  });
++});
+diff --git a/frontend/src/app/app.routes.ts b/frontend/src/app/app.routes.ts
+index 8389f28..39acf4a 100644
+--- a/frontend/src/app/app.routes.ts
++++ b/frontend/src/app/app.routes.ts
+@@ -1,5 +1,6 @@
+ import { Routes } from '@angular/router';
+ import { countryMatchGuard } from './core/country-match-guard';
++import { plansGuard } from './features/plan-list/plans-guard';
+ import { STEPS } from './shared/steps';
+ 
+ /** ADR-002 routes. Step components are placeholders until the features replace them. */
+@@ -19,7 +20,12 @@ export const routes: Routes = [
+         loadComponent: () =>
+           import('./features/applicant-form/applicant-form').then((m) => m.ApplicantForm),
+       },
+-      ...STEPS.filter((step) => step !== 'datos').map((step) => ({
++      {
++        path: 'planes',
++        canActivate: [plansGuard],
++        loadComponent: () => import('./features/plan-list/plan-list').then((m) => m.PlanList),
++      },
++      ...STEPS.filter((step) => step !== 'datos' && step !== 'planes').map((step) => ({
+         path: step,
+         data: { step },
+         loadComponent: () => import('./shared/step-placeholder').then((m) => m.StepPlaceholder),
+diff --git a/frontend/src/app/features/plan-list/plan-list-api.ts b/frontend/src/app/features/plan-list/plan-list-api.ts
+new file mode 100644
+index 0000000..d00f1f7
+--- /dev/null
++++ b/frontend/src/app/features/plan-list/plan-list-api.ts
+@@ -0,0 +1,23 @@
++import { Injectable, inject } from '@angular/core';
++import { Observable, map } from 'rxjs';
++import { StrapiClient, StrapiList } from '../../core/strapi-client';
++import { Plan, PlanRaw, toPlans } from './plan';
++
++/** Read-only access to the published, active plans of a country (SPEC-US-02 section 4.2). */
++@Injectable({ providedIn: 'root' })
++export class PlanListApi {
++  private readonly client = inject(StrapiClient);
++
++  /** `code` is the upper-case country code; `currency` the country's currency. No status param, no auth. */
++  plans(code: string, currency: string): Observable<Plan[]> {
++    const query =
++      `filters[country][code][$eq]=${encodeURIComponent(code)}` +
++      '&filters[active][$eq]=true' +
++      '&sort[0]=order:asc&sort[1]=name:asc' +
++      '&populate[0]=coverages&populate[1]=benefits' +
++      '&pagination[pageSize]=100';
++    return this.client
++      .get<StrapiList<PlanRaw>>(`/plans?${query}`)
++      .pipe(map((response) => toPlans(response.data, currency)));
++  }
++}
+diff --git a/frontend/src/app/features/plan-list/plan-list.css b/frontend/src/app/features/plan-list/plan-list.css
+new file mode 100644
+index 0000000..0574fe7
+--- /dev/null
++++ b/frontend/src/app/features/plan-list/plan-list.css
+@@ -0,0 +1,127 @@
++.plans {
++  display: grid;
++  gap: 1rem;
++  margin: 0 0 1rem;
++  padding: 0;
++  border: 0;
++  min-width: 0;
++}
++
++.plan {
++  display: grid;
++  gap: 0.5rem;
++  align-content: start;
++  padding: 1rem;
++  border: 1px solid #6b7480;
++  border-radius: 0.75rem;
++  background: #fff;
++}
++
++.plan--recommended {
++  border-color: var(--color-primary);
++  border-style: dashed;
++  border-width: 2px;
++}
++
++.plan--selected {
++  border-style: solid;
++  border-width: 4px;
++  padding: calc(1rem - 3px);
++}
++
++.plan__choice {
++  display: flex;
++  align-items: center;
++  gap: 0.75rem;
++  min-height: 44px;
++  font-weight: 700;
++  cursor: pointer;
++}
++
++.plan__choice input {
++  width: 1.5rem;
++  height: 1.5rem;
++  margin: 0;
++}
++
++.plan__choice input:focus-visible {
++  outline: 3px solid var(--color-primary);
++  outline-offset: 2px;
++}
++
++.plan:focus-within {
++  box-shadow: 0 0 0 3px var(--color-primary);
++}
++
++.plan__badge {
++  margin: 0;
++  justify-self: start;
++  padding: 0.125rem 0.625rem;
++  border-radius: 1rem;
++  background: var(--color-primary);
++  color: var(--color-primary-text);
++  font-size: 0.875rem;
++  font-weight: 700;
++}
++
++.plan__description,
++.plan__note {
++  margin: 0;
++}
++
++.plan__note,
++.plan__item-desc {
++  color: var(--color-muted);
++  font-size: 0.875rem;
++}
++
++.plan__price {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: baseline;
++  gap: 0.375rem;
++  margin: 0;
++}
++
++.plan__price-label {
++  flex-basis: 100%;
++  font-size: 0.875rem;
++}
++
++.plan__price strong {
++  font-size: 1.5rem;
++}
++
++.plan__heading {
++  margin: 0.5rem 0 0;
++  font-size: 1rem;
++}
++
++.plan__list {
++  margin: 0;
++  padding-left: 1.25rem;
++}
++
++
++.actions {
++  display: flex;
++  gap: 0.75rem;
++  flex-wrap: wrap;
++}
++
++.button--secondary {
++  background: transparent;
++  color: var(--color-text);
++  border: 2px solid var(--color-primary);
++}
++
++.button:disabled {
++  opacity: 0.5;
++  cursor: not-allowed;
++}
++
++@media (min-width: 1024px) {
++  .plans {
++    grid-template-columns: repeat(3, 1fr);
++  }
++}
+diff --git a/frontend/src/app/features/plan-list/plan-list.html b/frontend/src/app/features/plan-list/plan-list.html
+new file mode 100644
+index 0000000..d3bd820
+--- /dev/null
++++ b/frontend/src/app/features/plan-list/plan-list.html
+@@ -0,0 +1,98 @@
++<section class="page plan-list">
++  @if (country()) {
++    <h1 #heading tabindex="-1">{{ text('plans.title', '') }}</h1>
++  }
++
++  @if (!country()) {
++    <p role="alert" data-testid="plans-error">{{ fallback.error }}</p>
++    <button type="button" class="button" (click)="retry()">{{ fallback.retry }}</button>
++  } @else if (resource.isLoading()) {
++    <div aria-live="polite" data-testid="plans-loading">
++      <p>{{ text('plans.loading', fallback.loading) }}</p>
++    </div>
++  } @else if (resource.error()) {
++    <p role="alert" data-testid="plans-error">{{ text('plans.error', fallback.error) }}</p>
++    <button type="button" class="button" (click)="retry()">{{ text('common.retry', fallback.retry) }}</button>
++  } @else if (plans().length === 0) {
++    <p aria-live="polite" data-testid="plans-empty">{{ text('plans.empty', '') }}</p>
++    <div class="actions">
++      <button type="button" class="button button--secondary" (click)="back()">{{ text('common.back', '') }}</button>
++    </div>
++  } @else {
++    <fieldset class="plans">
++      <legend class="visually-hidden">{{ text('plans.title', '') }}</legend>
++      @for (plan of plans(); track plan.documentId; let i = $index) {
++        @let selected = selectedId() === plan.documentId;
++        @let highlighted = recommendedId() === plan.documentId;
++        <div
++          class="plan"
++          [class.plan--recommended]="highlighted"
++          [class.plan--selected]="selected"
++          [attr.data-testid]="'plan-card'"
++        >
++          <label class="plan__choice" [for]="'plan-' + plan.documentId">
++            <input
++              type="radio"
++              name="plan"
++              [id]="'plan-' + plan.documentId"
++              [value]="plan.documentId"
++              [checked]="selected"
++              [attr.aria-describedby]="'plan-' + plan.documentId + '-price' + (highlighted ? ' plan-' + plan.documentId + '-badge' : '')"
++              (change)="select(plan)"
++            />
++            <span class="plan__name">{{ plan.name }}</span>
++            @if (selected) {
++              <span class="plan__check" aria-hidden="true">&#10003;</span>
++            }
++          </label>
++          @if (highlighted) {
++            <p class="plan__badge" [id]="'plan-' + plan.documentId + '-badge'" data-testid="plan-badge">
++              {{ text('plans.recommendedBadge', '') }}
++            </p>
++          }
++          @if (plan.shortDescription) {
++            <p class="plan__description">{{ plan.shortDescription }}</p>
++          }
++          <p class="plan__price" [id]="'plan-' + plan.documentId + '-price'">
++            <span class="plan__price-label">{{ text('plans.priceLabel', '') }}</span>
++            <strong data-testid="plan-price">{{ price(plan) }}</strong>
++            <span>{{ text('plans.pricePeriod', '') }}</span>
++          </p>
++          <p class="plan__note">{{ text('plans.priceNote', '') }}</p>
++          @if (plan.coverages.length > 0) {
++            <h2 class="plan__heading">{{ text('plans.coveragesHeading', '') }}</h2>
++            <ul class="plan__list">
++              @for (item of plan.coverages; track $index) {
++                <li>
++                  {{ item.title }}
++                  @if (item.description) {
++                    <span class="plan__item-desc">{{ item.description }}</span>
++                  }
++                </li>
++              }
++            </ul>
++          }
++          @if (plan.benefits.length > 0) {
++            <h2 class="plan__heading">{{ text('plans.benefitsHeading', '') }}</h2>
++            <ul class="plan__list">
++              @for (item of plan.benefits; track $index) {
++                <li>
++                  {{ item.title }}
++                  @if (item.description) {
++                    <span class="plan__item-desc">{{ item.description }}</span>
++                  }
++                </li>
++              }
++            </ul>
++          }
++        </div>
++      }
++    </fieldset>
++    <div class="actions">
++      <button type="button" class="button button--secondary" (click)="back()">{{ text('common.back', '') }}</button>
++      <button type="button" class="button" [disabled]="!canContinue()" (click)="next()">
++        {{ text('common.continue', '') }}
++      </button>
++    </div>
++  }
++</section>
+diff --git a/frontend/src/app/features/plan-list/plan-list.spec.ts b/frontend/src/app/features/plan-list/plan-list.spec.ts
+new file mode 100644
+index 0000000..24916fe
+--- /dev/null
++++ b/frontend/src/app/features/plan-list/plan-list.spec.ts
+@@ -0,0 +1,221 @@
++import { ComponentFixture, TestBed } from '@angular/core/testing';
++import { provideRouter, Router } from '@angular/router';
++import { Observable, of } from 'rxjs';
++import { CLOCK } from '../../core/clock';
++import { CountryContext } from '../../core/country-context';
++import { CountryRaw } from '../../core/country-config';
++import { QuoteStore } from '../../core/quote-store';
++import { StrapiClient } from '../../core/strapi-client';
++import { FormFieldRaw } from '../applicant-form/form-field-config';
++import { PlanList } from './plan-list';
++import { PlanRaw, toPlans } from './plan';
++import { computeFinalPrice } from './pricing';
++
++const TODAY = new Date(2026, 5, 15); // fixed clock: year 2026
++
++const COPY = [
++  { key: 'plans.title', value: 'TITLE' },
++  { key: 'plans.loading', value: 'LOADING-MSG' },
++  { key: 'plans.error', value: 'ERROR-MSG' },
++  { key: 'plans.empty', value: 'EMPTY-MSG' },
++  { key: 'plans.recommendedBadge', value: 'BADGE' },
++  { key: 'plans.priceLabel', value: 'PRICE' },
++  { key: 'plans.pricePeriod', value: '/yr' },
++  { key: 'plans.priceNote', value: 'NOTE' },
++  { key: 'plans.coveragesHeading', value: 'COVERAGES' },
++  { key: 'plans.benefitsHeading', value: 'BENEFITS' },
++  { key: 'common.continue', value: 'CONTINUE' },
++  { key: 'common.back', value: 'BACK' },
++  { key: 'common.retry', value: 'RETRY' },
++];
++
++const country: CountryRaw = {
++  code: 'XX',
++  name: 'Testland',
++  numberLocale: 'es-CO',
++  currency: 'COP',
++  legalAge: 18,
++  copy: COPY,
++};
++
++const plan = (over: Partial<PlanRaw> & { documentId: string; name: string }): PlanRaw => ({
++  shortDescription: null,
++  basePrice: 1000,
++  currency: 'COP',
++  order: 1,
++  recommended: false,
++  coverages: [],
++  benefits: [],
++  ...over,
++});
++
++const yearField: FormFieldRaw = {
++  key: 'year',
++  label: 'Year',
++  type: 'number',
++  order: 1,
++  group: 'vehicle',
++  validations: [{ type: 'vehicleYear' }],
++};
++
++interface Setup {
++  fixture: ComponentFixture<PlanList>;
++  el: HTMLElement;
++  store: QuoteStore;
++  navigate: ReturnType<typeof vi.spyOn>;
++}
++
++async function setup(
++  plans: PlanRaw[] | Observable<{ data: PlanRaw[] }>,
++  opts: { fields?: FormFieldRaw[]; selected?: string | null; values?: Record<string, number> } = {},
++): Promise<Setup> {
++  const plansStream = Array.isArray(plans) ? of({ data: plans }) : plans;
++  const get = vi.fn((path: string) => {
++    if (path.startsWith('/countries')) return of({ data: [country] });
++    if (path.startsWith('/form-fields')) return of({ data: opts.fields ?? [yearField] });
++    if (path.startsWith('/plans')) return plansStream;
++    throw new Error(`unexpected ${path}`);
++  });
++  TestBed.configureTestingModule({
++    providers: [
++      provideRouter([]),
++      { provide: StrapiClient, useValue: { get } },
++      { provide: CLOCK, useValue: () => TODAY },
++    ],
++  });
++  await TestBed.inject(CountryContext).resolve('XX');
++  const store = TestBed.inject(QuoteStore);
++  store.activate('XX');
++  store.setApplicant(opts.values ?? { year: 2023 });
++  if (opts.selected !== undefined) store.selectPlan(opts.selected);
++  const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
++  const fixture = TestBed.createComponent(PlanList);
++  fixture.detectChanges();
++  await fixture.whenStable();
++  fixture.detectChanges();
++  return { fixture, el: fixture.nativeElement as HTMLElement, store, navigate };
++}
++
++const continueButton = (el: HTMLElement) =>
++  Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('CONTINUE')) as HTMLButtonElement | undefined;
++
++describe('US-02 pricing and plan list (unit)', () => {
++  beforeEach(() => {
++    sessionStorage.clear();
++    TestBed.resetTestingModule();
++  });
++
++  describe('US-02-AC-05 computes final price by vehicle age', () => {
++    const cases: Array<[number, number, number]> = [
++      [2027, 850000, 850000],
++      [2021, 850000, 850000],
++      [2020, 850000, 977500],
++      [2016, 850000, 977500],
++      [2015, 850000, 1105000],
++      [2006, 850000, 1105000],
++      [2020, 33333, 38333],
++    ];
++    for (const [year, base, final] of cases) {
++      it(`US-02-AC-05 computes final price by vehicle age (year ${year}, base ${base} -> ${final})`, () => {
++        expect(computeFinalPrice(base, year, TODAY)).toBe(final);
++      });
++    }
++  });
++
++  it('US-02-AC-17 uses factor 1 when vehicle year is missing', () => {
++    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++    expect(computeFinalPrice(850000, null, TODAY)).toBe(850000);
++    expect(warn).toHaveBeenCalled();
++    warn.mockRestore();
++  });
++
++  it('US-02-AC-17 uses factor 1 when no step 1 field uses the vehicleYear validator', async () => {
++    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++    const noYear: FormFieldRaw = { ...yearField, validations: [] };
++    const { el } = await setup([plan({ documentId: 'a', name: 'Plan A', basePrice: 850000 })], {
++      fields: [noYear],
++      values: { year: 2006 },
++    });
++    const expected = new Intl.NumberFormat('es-CO', {
++      style: 'currency',
++      currency: 'COP',
++      minimumFractionDigits: 0,
++      maximumFractionDigits: 0,
++    }).format(850000);
++    expect(el.querySelector('[data-testid="plan-price"]')?.textContent?.trim()).toBe(expected);
++    expect(warn).toHaveBeenCalled();
++    warn.mockRestore();
++  });
++
++  it('US-02-AC-04 shows empty state when no plans', async () => {
++    const { el } = await setup([]);
++    expect(el.querySelector('[data-testid="plans-empty"]')?.textContent).toContain('EMPTY-MSG');
++    expect(el.querySelectorAll('input[type=radio]').length).toBe(0);
++    expect(continueButton(el)).toBeUndefined();
++    expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('BACK'))).toBe(true);
++  });
++
++  it('US-02-AC-09 disables continue until a plan is selected', async () => {
++    const { el, fixture } = await setup([plan({ documentId: 'a', name: 'Plan A' }), plan({ documentId: 'b', name: 'Plan B', order: 2 })]);
++    expect(el.querySelectorAll('input[type=radio]:checked').length).toBe(0);
++    expect(continueButton(el)?.disabled).toBe(true);
++
++    const radio = el.querySelector('input[type=radio]') as HTMLInputElement;
++    radio.click();
++    fixture.detectChanges();
++    expect(continueButton(el)?.disabled).toBe(false);
++  });
++
++  it('US-02-AC-12 clears selection of a plan no longer offered', async () => {
++    const { el, store } = await setup([plan({ documentId: 'a', name: 'Plan A' })], { selected: 'gone-id' });
++    expect(store.planDocumentId()).toBeNull();
++    expect(el.querySelectorAll('input[type=radio]:checked').length).toBe(0);
++    expect(continueButton(el)?.disabled).toBe(true);
++  });
++
++  it('US-02-AC-12 keeps selection of a plan that is still offered', async () => {
++    const { store, el } = await setup([plan({ documentId: 'a', name: 'Plan A' })], { selected: 'a' });
++    expect(store.planDocumentId()).toBe('a');
++    expect(continueButton(el)?.disabled).toBe(false);
++  });
++
++  it('US-02-AC-16 hides plans with wrong currency or invalid price', () => {
++    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++    const result = toPlans(
++      [
++        plan({ documentId: 'x', name: 'Plan X', currency: 'CLP' }),
++        plan({ documentId: 'y', name: 'Plan Y', basePrice: 0 }),
++        plan({ documentId: 'ok', name: 'Plan OK', basePrice: 850000 }),
++      ],
++      'COP',
++    );
++    expect(result.map((p) => p.name)).toEqual(['Plan OK']);
++    const messages = warn.mock.calls.map((c) => String(c[0]));
++    expect(messages.some((m) => m.includes('Plan X'))).toBe(true);
++    expect(messages.some((m) => m.includes('Plan Y'))).toBe(true);
++    warn.mockRestore();
++  });
++
++  it('US-02-AC-16 hides plans with wrong currency or invalid price (rendered)', async () => {
++    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++    const { el } = await setup([
++      plan({ documentId: 'x', name: 'Plan X', currency: 'CLP' }),
++      plan({ documentId: 'y', name: 'Plan Y', basePrice: 0 }),
++      plan({ documentId: 'ok', name: 'Plan OK' }),
++    ]);
++    const names = Array.from(el.querySelectorAll('.plan__name')).map((n) => n.textContent?.trim());
++    expect(names).toEqual(['Plan OK']);
++    warn.mockRestore();
++  });
++
++  it('US-02-AC-18 renders CMS text as plain text', async () => {
++    const payload = '<img src=x onerror=alert(1)>Texto';
++    const { el } = await setup([
++      plan({ documentId: 'a', name: 'Plan A', shortDescription: payload, benefits: [] }),
++    ]);
++    const description = el.querySelector('.plan__description');
++    expect(description?.textContent).toContain(payload);
++    expect(el.querySelector('img')).toBeNull();
++    expect(el.textContent).not.toContain('BENEFITS');
++  });
++});
+diff --git a/frontend/src/app/features/plan-list/plan-list.ts b/frontend/src/app/features/plan-list/plan-list.ts
+new file mode 100644
+index 0000000..0b46a0c
+--- /dev/null
++++ b/frontend/src/app/features/plan-list/plan-list.ts
+@@ -0,0 +1,147 @@
++import {
++  ChangeDetectionStrategy,
++  Component,
++  ElementRef,
++  Injector,
++  afterNextRender,
++  computed,
++  effect,
++  inject,
++  untracked,
++  viewChild,
++} from '@angular/core';
++import { rxResource } from '@angular/core/rxjs-interop';
++import { Router } from '@angular/router';
++import { forkJoin, map } from 'rxjs';
++import { CLOCK } from '../../core/clock';
++import { CountryContext } from '../../core/country-context';
++import { QuoteStore } from '../../core/quote-store';
++import { FALLBACK_COPY } from '../../core/site-copy';
++import { ApplicantFormApi } from '../applicant-form/applicant-form-api';
++import { Plan } from './plan';
++import { PlanListApi } from './plan-list-api';
++import { computeFinalPrice } from './pricing';
++
++/** Step 2: plans of the route's country with a simulated price (SPEC-US-02). */
++@Component({
++  selector: 'app-plan-list',
++  templateUrl: './plan-list.html',
++  styleUrl: './plan-list.css',
++  changeDetection: ChangeDetectionStrategy.OnPush,
++})
++export class PlanList {
++  private readonly api = inject(PlanListApi);
++  private readonly formApi = inject(ApplicantFormApi);
++  private readonly context = inject(CountryContext);
++  private readonly store = inject(QuoteStore);
++  private readonly router = inject(Router);
++  private readonly clock = inject(CLOCK);
++  private readonly injector = inject(Injector);
++  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
++
++  protected readonly fallback = FALLBACK_COPY;
++  protected readonly country = this.context.current;
++  protected readonly selectedId = this.store.planDocumentId;
++
++  /** Plans plus the key of the step 1 field that uses the `vehicleYear` validator (GAP-12). */
++  protected readonly resource = rxResource({
++    params: () => this.country() ?? undefined,
++    stream: ({ params }) =>
++      forkJoin({
++        plans: this.api.plans(params.code, params.currency),
++        yearKey: this.formApi
++          .fields(params.code)
++          .pipe(map((fields) => fields.find((f) => f.validations.some((v) => v.type === 'vehicleYear'))?.key ?? null)),
++      }),
++  });
++
++  protected readonly plans = computed<Plan[]>(() => (this.resource.hasValue() ? this.resource.value().plans : []));
++  protected readonly recommendedId = computed(() => this.plans().find((p) => p.recommended)?.documentId ?? null);
++  protected readonly canContinue = computed(() => {
++    const id = this.selectedId();
++    return id !== null && this.plans().some((p) => p.documentId === id);
++  });
++
++  private readonly vehicleYear = computed<number | null>(() => {
++    if (!this.resource.hasValue()) {
++      return null;
++    }
++    const key = this.resource.value().yearKey;
++    const value = key ? this.store.values()[key] : null;
++    return typeof value === 'number' ? value : null;
++  });
++
++  private readonly formatter = computed(() => {
++    const c = this.country();
++    return c
++      ? new Intl.NumberFormat(c.numberLocale, {
++          style: 'currency',
++          currency: c.currency,
++          minimumFractionDigits: 0,
++          maximumFractionDigits: 0,
++        })
++      : null;
++  });
++
++  private headingFocused = false;
++
++  constructor() {
++    // GAP-17: a persisted plan that is no longer offered is cleared silently.
++    effect(() => {
++      if (this.resource.hasValue() && !this.resource.isLoading()) {
++        const id = untracked(() => this.store.planDocumentId());
++        if (id !== null && !this.plans().some((p) => p.documentId === id)) {
++          untracked(() => this.store.selectPlan(null));
++        }
++      }
++    });
++    // GAP-23: focus the heading once content has loaded.
++    effect(() => {
++      const heading = this.heading();
++      if (heading && this.resource.hasValue() && !this.headingFocused) {
++        this.headingFocused = true;
++        afterNextRender(() => heading.nativeElement.focus(), { injector: this.injector });
++      }
++    });
++  }
++
++  protected text(key: string, fallback: string): string {
++    const value = this.country()?.copy[key];
++    if (value === undefined) {
++      console.warn(`Missing copy key: ${key}`);
++      return fallback;
++    }
++    return value;
++  }
++
++  protected price(plan: Plan): string {
++    const amount = computeFinalPrice(plan.basePrice, this.vehicleYear(), this.clock());
++    return this.formatter()?.format(amount) ?? String(amount);
++  }
++
++  protected select(plan: Plan): void {
++    this.store.selectPlan(plan.documentId);
++  }
++
++  protected retry(): void {
++    this.headingFocused = false;
++    this.resource.reload();
++  }
++
++  protected back(): void {
++    this.navigate('datos');
++  }
++
++  protected next(): void {
++    if (this.canContinue()) {
++      this.navigate('resumen');
++    }
++  }
++
++  private navigate(step: string): void {
++    const code = this.country()?.code.toLowerCase();
++    if (code) {
++      void this.router.navigate(['/', code, step]);
++    }
++  }
++}
+diff --git a/frontend/src/app/features/plan-list/plan.ts b/frontend/src/app/features/plan-list/plan.ts
+new file mode 100644
+index 0000000..6a2df48
+--- /dev/null
++++ b/frontend/src/app/features/plan-list/plan.ts
+@@ -0,0 +1,64 @@
++/** Domain model and mapper for Strapi `plan` entries (SPEC-US-02 section 4.2). */
++export interface PlanItem {
++  title: string;
++  description: string | null;
++}
++
++export interface Plan {
++  documentId: string;
++  name: string;
++  shortDescription: string | null;
++  basePrice: number;
++  currency: string;
++  order: number;
++  recommended: boolean;
++  coverages: PlanItem[];
++  benefits: PlanItem[];
++}
++
++export interface PlanRaw {
++  documentId: string;
++  name: string;
++  shortDescription?: string | null;
++  basePrice?: number | string | null;
++  currency?: string | null;
++  order?: number | null;
++  recommended?: boolean | null;
++  coverages?: Array<{ title: string; description?: string | null }> | null;
++  benefits?: Array<{ title: string; description?: string | null }> | null;
++}
++
++function toItems(raw: PlanRaw['coverages']): PlanItem[] {
++  return (raw ?? []).map((i) => ({ title: i.title, description: i.description ?? null }));
++}
++
++/**
++ * Maps and filters (GAP-14, GAP-15): plans whose currency differs from the country's, or whose
++ * base price is not a finite number > 0, are dropped with a console warning. Order is kept.
++ */
++export function toPlans(raws: readonly PlanRaw[], countryCurrency: string): Plan[] {
++  const plans: Plan[] = [];
++  for (const raw of raws) {
++    if (raw.currency !== countryCurrency) {
++      console.warn(`Plan hidden (currency ${raw.currency} differs from ${countryCurrency}): "${raw.name}"`);
++      continue;
++    }
++    const basePrice = raw.basePrice === null || raw.basePrice === undefined ? NaN : Number(raw.basePrice);
++    if (!Number.isFinite(basePrice) || basePrice <= 0) {
++      console.warn(`Plan hidden (invalid base price): "${raw.name}"`);
++      continue;
++    }
++    plans.push({
++      documentId: raw.documentId,
++      name: raw.name,
++      shortDescription: raw.shortDescription ?? null,
++      basePrice,
++      currency: raw.currency,
++      order: raw.order ?? 0,
++      recommended: raw.recommended === true,
++      coverages: toItems(raw.coverages),
++      benefits: toItems(raw.benefits),
++    });
++  }
++  return plans;
++}
+diff --git a/frontend/src/app/features/plan-list/plans-guard.ts b/frontend/src/app/features/plan-list/plans-guard.ts
+new file mode 100644
+index 0000000..3eaaf62
+--- /dev/null
++++ b/frontend/src/app/features/plan-list/plans-guard.ts
+@@ -0,0 +1,34 @@
++import { inject } from '@angular/core';
++import { CanActivateFn, Router } from '@angular/router';
++import { firstValueFrom } from 'rxjs';
++import { CLOCK } from '../../core/clock';
++import { CountryContext } from '../../core/country-context';
++import { QuoteStore } from '../../core/quote-store';
++import { ApplicantFormApi } from '../applicant-form/applicant-form-api';
++import { isStep1Valid } from '../applicant-form/validators';
++
++/** GAP-05: step 2 needs a valid step 1; otherwise redirect to `/{cc}/datos`. Validated with the form's own engine. */
++export const plansGuard: CanActivateFn = async () => {
++  const router = inject(Router);
++  const country = inject(CountryContext).current();
++  const store = inject(QuoteStore);
++  const api = inject(ApplicantFormApi);
++  const now = inject(CLOCK);
++  if (!country) {
++    return true; // the step shows its own technical error state
++  }
++  const redirect = router.createUrlTree(['/', country.code.toLowerCase(), 'datos']);
++  const values = store.values();
++  if (Object.keys(values).length === 0) {
++    return redirect;
++  }
++  try {
++    const fields = await firstValueFrom(api.fields(country.code));
++    const genericError = country.copy['form.genericError'] ?? '';
++    return isStep1Valid(fields, values, { legalAge: country.legalAge, now, genericError })
++      ? true
++      : redirect;
++  } catch {
++    return redirect;
++  }
++};
+diff --git a/frontend/src/app/features/plan-list/pricing.ts b/frontend/src/app/features/plan-list/pricing.ts
+new file mode 100644
+index 0000000..05652e2
+--- /dev/null
++++ b/frontend/src/app/features/plan-list/pricing.ts
+@@ -0,0 +1,27 @@
++/**
++ * Simulated rating (SPEC-US-02 GAP-07, GAP-11, GAP-13): the age factors are one documented constant,
++ * identical for every country. Not country content; moving them to Strapi is a later option.
++ * Vehicle age bands: 0-5 years -> 1.00, 6-10 -> 1.15, 11-20 -> 1.30.
++ */
++const AGE_FACTORS: ReadonlyArray<{ maxAge: number; factor: number }> = [
++  { maxAge: 5, factor: 1.0 },
++  { maxAge: 10, factor: 1.15 },
++  { maxAge: 20, factor: 1.3 },
++];
++
++/** Ages above the last band (blocked by step 1 validation) use the highest factor. */
++const FALLBACK_FACTOR = 1.3;
++
++/** Pure and reused by US-03. A missing year gives factor 1.00 and a console warning (GAP-12). */
++export function computeFinalPrice(basePrice: number, vehicleYear: number | null, today: Date): number {
++  return Math.round(basePrice * ageFactor(vehicleYear, today));
++}
++
++export function ageFactor(vehicleYear: number | null, today: Date): number {
++  if (typeof vehicleYear !== 'number' || !Number.isInteger(vehicleYear)) {
++    console.warn('Vehicle year unavailable; using age factor 1.00.');
++    return 1;
++  }
++  const age = Math.max(0, today.getFullYear() - vehicleYear);
++  return AGE_FACTORS.find((band) => age <= band.maxAge)?.factor ?? FALLBACK_FACTOR;
++}
