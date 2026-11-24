@@ -79,6 +79,8 @@ TODO: Public role permissions and their justification; no tokens in the browser.
 | Missing Strapi copy for `form.title`, `form.intro`, `form.empty` or `common.continue` renders empty text, and the missing-key warning is logged on every change-detection pass (REVIEW-US-01-F09). | Low: the seed defines all keys; affects only misconfigured content. | Accepted (Andres Beltran, 2026-11-23, HC3 US-01). | Technical fallbacks for those keys; warn once per key. |
 | Plan prices are recomputed in the template on every change-detection pass; when the vehicle year is unavailable, the factor-1 warning (and any missing-copy warning) is logged repeatedly (REVIEW-US-02-F03). | Low: console noise only; prices are correct. | Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Compute priced plans once in a `computed`; warn once. |
 | The plans step fetches `/form-fields` twice (guard + component), and if only `/form-fields` fails the whole plan list shows the error state instead of falling back to factor 1.00 (REVIEW-US-02-F04). | Low: rare failure case; "Reintentar" recovers. | Accepted (Andres Beltran, 2026-11-23, HC3 US-02). | Cache form fields per country and map a fields failure to "no vehicle year". |
+| When Strapi is unreachable, `/{cc}/confirmacion` renders an empty page (no heading, error or retry) instead of redirecting to step 1 (REVIEW-US-03-F06). | Low: Strapi-down only; no confirmation can exist in that state. | Accepted (Andres Beltran, 2026-11-23, HC3 US-03). | When the country is null, redirect to `/{route param}/datos`. |
+| The summary and confirmation duplicate the copy lookup instead of the shared `copy()` helper, so a missing copy key is logged on every change-detection pass (REVIEW-US-03-F08). The unused `StepPlaceholder` and a stale routes comment remain (REVIEW-US-03-F07). | Low: cosmetic, no user impact. | Accepted (Andres Beltran, 2026-11-23, HC3 US-03). | Use `copy()`; delete `step-placeholder.ts`. |
 
 ## Manual checks (P2 without automated test)
 
@@ -100,7 +102,7 @@ TODO: Public role permissions and their justification; no tokens in the browser.
 | US-03-AC-17 (terms acceptance resets on re-entry) | Pending manual check. Implemented. |
 | US-03-AC-18 (confirmation without data redirects to step 1) | Pending manual check. Implemented. When Strapi is down, the confirmation page renders empty (REVIEW-US-03-F06, accepted risk). |
 | US-03-AC-19 (cancel closes the gateway and returns focus) | Pending manual check. Implemented. |
-| US-03-AC-20 (payment with keyboard only) | Automated for CO: `US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only`. CL pending manual check. |
+| US-03-AC-20 (payment with keyboard only) | Automated for CO: `US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only`. CL verified manually at HC4 (full keyboard-only flow in Chile), Andres Beltran, 2026-11-23. |
 | US-03-AC-21 (summary fits a 360px viewport) | Pending manual check. |
 
 ## Requirements not met
