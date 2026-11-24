@@ -94,6 +94,14 @@ TODO: Public role permissions and their justification; no tokens in the browser.
 | US-02-AC-11 (selection kept on return and reload) | Pending manual check. |
 | US-02-AC-20 (focus on arrival) | Pending manual check. |
 | US-02-AC-21 (responsive layout) | Pending manual check. |
+| US-03-AC-13 (summary error state with retry when Strapi fails) | Pending manual check. Implemented. |
+| US-03-AC-15 (selected plan no longer available shows "Cambiar plan") | Pending manual check. Implemented. |
+| US-03-AC-16 (option labels, locale dates, empty optional fields omitted) | Pending manual check. Implemented. |
+| US-03-AC-17 (terms acceptance resets on re-entry) | Pending manual check. Implemented. |
+| US-03-AC-18 (confirmation without data redirects to step 1) | Pending manual check. Implemented. When Strapi is down, the confirmation page renders empty (REVIEW-US-03-F06, accepted risk). |
+| US-03-AC-19 (cancel closes the gateway and returns focus) | Pending manual check. Implemented. |
+| US-03-AC-20 (payment with keyboard only) | Automated for CO: `US-01-AC-12 US-03-AC-20 completes the full Colombia flow with keyboard only`. CL pending manual check. |
+| US-03-AC-21 (summary fits a 360px viewport) | Pending manual check. |
 
 ## Requirements not met
 
