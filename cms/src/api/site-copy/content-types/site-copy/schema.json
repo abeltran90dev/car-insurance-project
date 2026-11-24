@@ -1,0 +1,9 @@
+{
+  "kind": "singleType",
+  "collectionName": "site_copies",
+  "info": { "singularName": "site-copy", "pluralName": "site-copies", "displayName": "Site copy" },
+  "options": { "draftAndPublish": false },
+  "attributes": {
+    "copy": { "type": "component", "component": "shared.copy-entry", "repeatable": true }
+  }
+}

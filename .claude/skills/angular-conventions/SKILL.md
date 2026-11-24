@@ -32,13 +32,13 @@ Checked against angular.dev on 2026-11-23. The site was at **v22.3**; v22 is the
 
 - Local and shared state uses `signal`, `computed` and `linkedSignal` ([signals](https://angular.dev/guide/signals), [linked-signal](https://angular.dev/guide/signals/linked-signal)). Use `effect` only for side effects that leave Angular (e.g. writing to `sessionStorage`), never to copy one signal into another.
 - Wizard state lives in **one root service** (`QuoteStore`) exposing readonly signals plus intent methods (`setApplicant()`, `selectPlan()`, `reset()`). Components never mutate store internals.
-- Persistence: the store writes a versioned snapshot (`{ v: 1, country, values, planDocumentId }` under key `quote:v1:{CC}`, per ADR-004) to `sessionStorage` from one `effect` and rehydrates on init. Drop the snapshot if its version or country doesn't match. The spec decides the exact fields.
+- Persistence: the store writes a versioned snapshot (`{ v: 1, country, values, planDocumentId }` under key `quote:v1:{CC}`, per ADR-004) to `sessionStorage` from one `effect` and rehydrates on init. Drop the snapshot if its version or country doesn't match. The spec decides the exact fields. Effects run lazily: tests that read `sessionStorage` after a store change must flush them first (`TestBed.tick()`).
 - RxJS only where it's natural (router events, HTTP internals). Convert to signals at the boundary.
 
 ## 4. Data loading and the loading/error pattern
 
-- HTTP: the current (v22) docs say `HttpClient` uses fetch by default and list only `withXhr()` ([http setup](https://angular.dev/guide/http/setup)). **[unverified] for v21**: on v21, register `provideHttpClient(withFetch())` in `app.config.ts`, after checking the v21 docs (v21.angular.dev/guide/http/setup) when scaffolding. Record the result here.
-- Read Strapi content with `httpResource()` or `resource()` inside a feature `*-api.ts` service ([http-resource](https://angular.dev/guide/http/http-resource), [resource](https://angular.dev/guide/signals/resource)). Read-only GETs only.
+- HTTP: the current (v22) docs say `HttpClient` uses fetch by default and list only `withXhr()` ([http setup](https://angular.dev/guide/http/setup)). On v21 (21.2, Phase 2) we register `provideHttpClient(withFetch())` in `app.config.ts`; it compiles and works. Whether fetch is already the v21 default was not verified, so keep `withFetch()` explicit.
+- Read Strapi content with `httpResource()`, `resource()` or `rxResource({ stream })` (from `@angular/core/rxjs-interop`) inside a feature `*-api.ts` service. **Exception:** `httpResource` has no timeout option; when a spec requires a request timeout, use `rxResource` with the RxJS `timeout` operator (same `isLoading()/error()/hasValue()/reload()` API). ([http-resource](https://angular.dev/guide/http/http-resource), [resource](https://angular.dev/guide/signals/resource)). Read-only GETs only.
 - Map raw Strapi responses to **typed domain models** in one mapper function (`toFormFieldConfig()`), unit-tested. Components never see raw Strapi shapes. No `any`. Unknown field types and invalid configs are dropped and logged with `console.warn`, never crash the form.
 - Every remote view handles all four states, driven by `status()`/`isLoading()`/`error()`/`hasValue()`:
 
@@ -61,8 +61,9 @@ Checked against angular.dev on 2026-11-23. The site was at **v22.3**; v22 is the
 
 ## 6. Routing and structure
 
-- Routes: `/:country/datos`, `/:country/planes`, `/:country/resumen`, `/:country/confirmacion` (decided in ADR-002: async `canMatch` resolves the code against Strapi; an unknown code renders not-found in place, keeping the URL). Lazy-load with `loadComponent` (**[unverified]**, see [loading-strategies](https://angular.dev/guide/routing/loading-strategies)).
+- Routes: `/:country/datos`, `/:country/planes`, `/:country/resumen`, `/:country/confirmacion` (decided in ADR-002: async `canMatch` resolves the code against Strapi; an unknown code renders not-found in place, keeping the URL). Lazy-load with `loadComponent` (verified in the Phase 2 scaffold: lazy chunks per route; see [loading-strategies](https://angular.dev/guide/routing/loading-strategies)).
 - Read route params as inputs with `withComponentInputBinding()` ([read-route-state](https://angular.dev/guide/routing/read-route-state)).
+- In async functional guards, call every `inject()` **before** the first `await`: the injection context is lost after it (hit in Phase 2). The current navigation is the signal `router.currentNavigation()` in v21 (`getCurrentNavigation()` is the older API).
 - Step guards are functional `CanActivateFn` that return a `UrlTree` (redirect to the first incomplete step), not `false` + navigate ([route-guards](https://angular.dev/guide/routing/route-guards)).
 - **Folders by feature, not by type** (no `components/`, `services/` folders). File names have no type suffix: `plan-list.ts`, `plan-list.html`, `plan-list.spec.ts` ([style guide](https://angular.dev/style-guide)).
 

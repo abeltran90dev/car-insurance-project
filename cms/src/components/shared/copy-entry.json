@@ -1,0 +1,9 @@
+{
+  "collectionName": "components_shared_copy_entries",
+  "info": { "displayName": "Copy entry", "description": "UI copy key/value (key convention: area.camelCaseName)" },
+  "options": {},
+  "attributes": {
+    "key": { "type": "string", "required": true },
+    "value": { "type": "text", "required": true }
+  }
+}

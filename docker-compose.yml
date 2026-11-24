@@ -1,0 +1,39 @@
+services:
+  cms:
+    build: ./cms
+    ports:
+      - "1337:1337"
+    environment:
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:4200}
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
+      # Strapi secrets are optional overrides; if unset, docker-entrypoint.sh generates them
+      # on first start and keeps them in the cms_data volume.
+      APP_KEYS: ${APP_KEYS:-}
+      API_TOKEN_SALT: ${API_TOKEN_SALT:-}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-}
+      TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+    volumes:
+      - cms_data:/data
+      - cms_uploads:/app/public/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1337/_health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      cms:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  cms_data:
+  cms_uploads:
