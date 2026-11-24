@@ -3,25 +3,32 @@
     <h1 #heading tabindex="-1">{{ text('plans.title', '') }}</h1>
   }
 
+  <div aria-live="polite" class="plan-list__status">
+    @if (!country()) {
+      <p data-testid="plans-error">{{ fallback.error }}</p>
+    } @else if (resource.isLoading()) {
+      <p data-testid="plans-loading">{{ text('plans.loading', fallback.loading) }}</p>
+    } @else if (resource.error()) {
+      <p data-testid="plans-error">{{ text('plans.error', fallback.error) }}</p>
+    } @else if (plans().length === 0) {
+      <p data-testid="plans-empty">{{ text('plans.empty', '') }}</p>
+    }
+  </div>
+
   @if (!country()) {
-    <p role="alert" data-testid="plans-error">{{ fallback.error }}</p>
     <button type="button" class="button" (click)="retry()">{{ fallback.retry }}</button>
   } @else if (resource.isLoading()) {
-    <div aria-live="polite" data-testid="plans-loading">
-      <p>{{ text('plans.loading', fallback.loading) }}</p>
-    </div>
+    <!-- status text is in the live region above -->
   } @else if (resource.error()) {
-    <p role="alert" data-testid="plans-error">{{ text('plans.error', fallback.error) }}</p>
     <button type="button" class="button" (click)="retry()">{{ text('common.retry', fallback.retry) }}</button>
   } @else if (plans().length === 0) {
-    <p aria-live="polite" data-testid="plans-empty">{{ text('plans.empty', '') }}</p>
     <div class="actions">
       <button type="button" class="button button--secondary" (click)="back()">{{ text('common.back', '') }}</button>
     </div>
   } @else {
     <fieldset class="plans">
       <legend class="visually-hidden">{{ text('plans.title', '') }}</legend>
-      @for (plan of plans(); track plan.documentId; let i = $index) {
+      @for (plan of plans(); track plan.documentId) {
         @let selected = selectedId() === plan.documentId;
         @let highlighted = recommendedId() === plan.documentId;
         <div
