@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  Injector,
   afterNextRender,
   computed,
   inject,
@@ -53,6 +54,7 @@ export class ApplicantForm {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly clock = inject(CLOCK);
+  private readonly injector = inject(Injector);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
@@ -185,7 +187,13 @@ export class ApplicantForm {
       const firstInvalid = this.fields().find((f) => form.controls[f.key].invalid);
       if (firstInvalid) {
         const id = this.id(firstInvalid);
-        Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('[id]')).find((el) => el.id === id)?.focus();
+        // Focus only after the error and aria attributes are rendered, so field and error are announced together.
+        afterNextRender(
+          () => {
+            Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('[id]')).find((el) => el.id === id)?.focus();
+          },
+          { injector: this.injector },
+        );
       }
       return;
     }
