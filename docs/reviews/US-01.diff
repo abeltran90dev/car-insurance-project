@@ -1,0 +1,1570 @@
+# US-01 review input  base=a249095 head=5f9e972
+## Commits
+5f9e972 test(US-01): e2e for data form, picker, not-found and public write denial
+997415f test(US-01): component tests for step 1 form
+db2ed7f test(US-01): unit tests for validators and form-field mapper
+58e2767 feat(US-01): render step 1 form from Strapi config
+04566ac feat(US-01): add form-field mapper, validation engine and clock
+## Changed files
+A	frontend/e2e/us-01-data-form.spec.ts
+M	frontend/src/app/app.routes.ts
+A	frontend/src/app/core/clock.ts
+A	frontend/src/app/features/applicant-form/applicant-form-api.ts
+A	frontend/src/app/features/applicant-form/applicant-form.css
+A	frontend/src/app/features/applicant-form/applicant-form.html
+A	frontend/src/app/features/applicant-form/applicant-form.spec.ts
+A	frontend/src/app/features/applicant-form/applicant-form.ts
+A	frontend/src/app/features/applicant-form/form-field-config.spec.ts
+A	frontend/src/app/features/applicant-form/form-field-config.ts
+A	frontend/src/app/features/applicant-form/validators.spec.ts
+A	frontend/src/app/features/applicant-form/validators.ts
+## Diff
+diff --git a/frontend/e2e/us-01-data-form.spec.ts b/frontend/e2e/us-01-data-form.spec.ts
+new file mode 100644
+index 0000000..7352d3d
+--- /dev/null
++++ b/frontend/e2e/us-01-data-form.spec.ts
+@@ -0,0 +1,101 @@
++import { expect, test } from '@playwright/test';
++
++test.describe('US-01 step 1 (e2e)', () => {
++  test('US-01-AC-04 keeps step 1 data when going back', async ({ page }) => {
++    await page.goto('/co/datos');
++    await expect(page.locator('div.field[data-field="documentNumber"]')).toBeVisible();
++
++    const year = String(new Date().getFullYear() - 2);
++    await page.locator('#field-documentType').selectOption('CC');
++    await page.locator('#field-documentNumber').fill('1111111111');
++    await page.locator('#field-firstName').fill('Ana');
++    await page.locator('#field-lastName').fill('Prueba');
++    await page.locator('#field-birthDate').fill('1990-01-15');
++    await page.locator('#field-email').fill('ana.prueba@example.test');
++    await page.locator('#field-phone').fill('3001234567');
++    await page.locator('#field-city').selectOption('bogota');
++    await page.locator('#field-acceptDataPolicy').check();
++    await page.locator('#field-plate').fill('ABC123');
++    await page.locator('#field-brand').selectOption('toyota');
++    await page.locator('#field-model').fill('Modelo Uno');
++    await page.locator('#field-year').fill(year);
++    await page.locator('#field-mileage').fill('12000');
++
++    await page.locator('button[type=submit]').click();
++    await expect(page).toHaveURL(/\/co\/planes$/);
++
++    await page.goBack();
++    await expect(page).toHaveURL(/\/co\/datos$/);
++    await expect(page.locator('#field-firstName')).toHaveValue('Ana');
++    await expect(page.locator('#field-documentNumber')).toHaveValue('1111111111');
++    await expect(page.locator('#field-documentType')).toHaveValue('CC');
++    await expect(page.locator('#field-birthDate')).toHaveValue('1990-01-15');
++    await expect(page.locator('#field-acceptDataPolicy')).toBeChecked();
++    await expect(page.locator('#field-year')).toHaveValue(year);
++  });
++
++  for (const cc of ['co', 'cl']) {
++    test(`US-01-AC-05 hides unpublished fields (${cc})`, async ({ page, request }) => {
++      // Seed data: one draft field "draftOnlyField" per country.
++      await page.goto(`/${cc}/datos`);
++      await expect(page.locator('div.field').first()).toBeVisible();
++      await expect(page.locator('div.field[data-field="draftOnlyField"]')).toHaveCount(0);
++      const api = await request.get(
++        `/api/form-fields?filters[country][code][$eq]=${cc.toUpperCase()}&pagination[pageSize]=100`,
++      );
++      const body = await api.json();
++      expect(body.data.map((f: { key: string }) => f.key)).not.toContain('draftOnlyField');
++    });
++  }
++
++  test('US-01-AC-22 lists countries from Strapi on the picker', async ({ page, request }) => {
++    const countries = (await (await request.get('/api/countries?sort=name:asc&pagination[pageSize]=100')).json())
++      .data as Array<{ code: string; name: string }>;
++    expect(countries.length).toBeGreaterThanOrEqual(2);
++    await page.goto('/');
++    for (const c of countries) {
++      const link = page.getByRole('link', { name: c.name, exact: true });
++      await expect(link).toBeVisible();
++      await expect(link).toHaveAttribute('href', `/${c.code.toLowerCase()}`);
++    }
++    const chile = countries.find((c) => c.code === 'CL')!;
++    await page.getByRole('link', { name: chile.name, exact: true }).click();
++    await expect(page).toHaveURL(/\/cl\/datos$/);
++  });
++
++  test('US-01-AC-23 shows not-found for unknown country code', async ({ page }) => {
++    const formFieldRequests: string[] = [];
++    page.on('request', (r) => {
++      if (r.url().includes('/api/form-fields')) {
++        formFieldRequests.push(r.url());
++      }
++    });
++    await page.goto('/zz/datos');
++    await expect(page.locator('a[href="/"]')).toBeVisible();
++    await expect(page.locator('form')).toHaveCount(0);
++    await page.waitForLoadState('networkidle');
++    expect(formFieldRequests).toEqual([]);
++  });
++
++  test('US-01-AC-15 public write to form-fields, countries and site-copy is denied', async ({ request }) => {
++    const denied = [401, 403];
++    const fieldId = (await (await request.get('/api/form-fields?pagination[pageSize]=1')).json()).data[0].documentId;
++    const countryId = (await (await request.get('/api/countries?pagination[pageSize]=1')).json()).data[0].documentId;
++    const payload = { data: { key: 'hacked' } };
++
++    expect(denied).toContain((await request.post('/api/form-fields', { data: payload })).status());
++    expect(denied).toContain((await request.put(`/api/form-fields/${fieldId}`, { data: payload })).status());
++    expect(denied).toContain((await request.delete(`/api/form-fields/${fieldId}`)).status());
++
++    expect(denied).toContain((await request.post('/api/countries', { data: payload })).status());
++    expect(denied).toContain((await request.put(`/api/countries/${countryId}`, { data: payload })).status());
++    expect(denied).toContain((await request.delete(`/api/countries/${countryId}`)).status());
++
++    expect(denied).toContain((await request.put('/api/site-copy', { data: payload })).status());
++    expect(denied).toContain((await request.delete('/api/site-copy')).status());
++
++    for (const path of ['/api/form-fields', '/api/countries', '/api/site-copy']) {
++      expect((await request.get(path)).status()).toBe(200);
++    }
++  });
++});
+diff --git a/frontend/src/app/app.routes.ts b/frontend/src/app/app.routes.ts
+index 47e1f35..8389f28 100644
+--- a/frontend/src/app/app.routes.ts
++++ b/frontend/src/app/app.routes.ts
+@@ -14,7 +14,12 @@ export const routes: Routes = [
+     canMatch: [countryMatchGuard],
+     loadComponent: () => import('./shared/country-shell').then((m) => m.CountryShell),
+     children: [
+-      ...STEPS.map((step) => ({
++      {
++        path: 'datos',
++        loadComponent: () =>
++          import('./features/applicant-form/applicant-form').then((m) => m.ApplicantForm),
++      },
++      ...STEPS.filter((step) => step !== 'datos').map((step) => ({
+         path: step,
+         data: { step },
+         loadComponent: () => import('./shared/step-placeholder').then((m) => m.StepPlaceholder),
+diff --git a/frontend/src/app/core/clock.ts b/frontend/src/app/core/clock.ts
+new file mode 100644
+index 0000000..ca81cf5
+--- /dev/null
++++ b/frontend/src/app/core/clock.ts
+@@ -0,0 +1,7 @@
++import { InjectionToken } from '@angular/core';
++
++/** Injectable clock so date-dependent validators can be tested with a fixed "today". */
++export const CLOCK = new InjectionToken<() => Date>('CLOCK', {
++  providedIn: 'root',
++  factory: () => () => new Date(),
++});
+diff --git a/frontend/src/app/features/applicant-form/applicant-form-api.ts b/frontend/src/app/features/applicant-form/applicant-form-api.ts
+new file mode 100644
+index 0000000..c3fe850
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/applicant-form-api.ts
+@@ -0,0 +1,22 @@
++import { Injectable, inject } from '@angular/core';
++import { Observable, map } from 'rxjs';
++import { StrapiClient, StrapiList } from '../../core/strapi-client';
++import { FormFieldConfig, FormFieldRaw, toFormFieldConfigs } from './form-field-config';
++
++/** Read-only access to the published form fields of a country (SPEC-US-01 section 4.2). */
++@Injectable({ providedIn: 'root' })
++export class ApplicantFormApi {
++  private readonly client = inject(StrapiClient);
++
++  /** `code` is the upper-case Strapi country code. Published documents only (no status param). */
++  fields(code: string): Observable<FormFieldConfig[]> {
++    const query =
++      `filters[country][code][$eq]=${encodeURIComponent(code)}` +
++      '&sort[0]=order:asc&sort[1]=key:asc' +
++      '&populate[0]=options&populate[1]=validations' +
++      '&pagination[pageSize]=100';
++    return this.client
++      .get<StrapiList<FormFieldRaw>>(`/form-fields?${query}`)
++      .pipe(map((response) => toFormFieldConfigs(response.data)));
++  }
++}
+diff --git a/frontend/src/app/features/applicant-form/applicant-form.css b/frontend/src/app/features/applicant-form/applicant-form.css
+new file mode 100644
+index 0000000..6dbe9d1
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/applicant-form.css
+@@ -0,0 +1,59 @@
++.form {
++  display: grid;
++  gap: 1rem;
++}
++
++.field {
++  display: grid;
++  gap: 0.25rem;
++}
++
++.field--checkbox {
++  grid-template-columns: auto 1fr;
++  align-items: start;
++  column-gap: 0.75rem;
++}
++
++.field--checkbox input {
++  width: 1.5rem;
++  height: 1.5rem;
++  margin: 0.5rem 0 0;
++}
++
++.field--checkbox .field__help,
++.field--checkbox .field__error {
++  grid-column: 2;
++}
++
++.field label {
++  font-weight: 600;
++}
++
++.field input:not([type='checkbox']),
++.field select {
++  width: 100%;
++  min-height: 44px;
++  padding: 0 0.75rem;
++  border: 1px solid #6b7480;
++  border-radius: 0.5rem;
++  background: #fff;
++  color: inherit;
++  font: inherit;
++}
++
++.field [aria-invalid='true'] {
++  border-color: #b00020;
++}
++
++.field__help {
++  margin: 0;
++  color: var(--color-muted);
++  font-size: 0.875rem;
++}
++
++.field__error {
++  margin: 0;
++  color: #b00020;
++  font-size: 0.875rem;
++  font-weight: 600;
++}
+diff --git a/frontend/src/app/features/applicant-form/applicant-form.html b/frontend/src/app/features/applicant-form/applicant-form.html
+new file mode 100644
+index 0000000..736b158
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/applicant-form.html
+@@ -0,0 +1,92 @@
++<section class="page applicant-form">
++  @if (country(); as c) {
++    <h1 #heading tabindex="-1">{{ text('form.title', '') }}</h1>
++  }
++
++  @if (!country()) {
++    <p role="alert" data-testid="form-error">{{ fallback.error }}</p>
++    <button type="button" class="button" (click)="retry()">{{ fallback.retry }}</button>
++  } @else if (fieldsResource.isLoading()) {
++    <div aria-live="polite" data-testid="form-loading">
++      <p>{{ text('form.loading', fallback.loading) }}</p>
++    </div>
++  } @else if (fieldsResource.error()) {
++    <p role="alert" data-testid="form-error">{{ text('form.error', fallback.error) }}</p>
++    <button type="button" class="button" (click)="retry()">{{ text('common.retry', fallback.retry) }}</button>
++  } @else if (fieldsResource.hasValue() && fields().length === 0) {
++    <p data-testid="form-empty">{{ text('form.empty', '') }}</p>
++  } @else if (form(); as group) {
++    <p>{{ text('form.intro', '') }}</p>
++    <form class="form" [formGroup]="group" (ngSubmit)="submit()" novalidate>
++      @for (field of fields(); track field.key) {
++        @let error = errorFor(field.key);
++        <div class="field" [class.field--checkbox]="field.type === 'checkbox'" [attr.data-field]="field.key">
++          @switch (field.type) {
++            @case ('checkbox') {
++              <input
++                type="checkbox"
++                [id]="id(field)"
++                [formControl]="controlFor(field.key)"
++                [attr.required]="field.required ? '' : null"
++                [attr.aria-required]="field.required ? 'true' : null"
++                [attr.aria-invalid]="error ? 'true' : null"
++                [attr.aria-describedby]="describedBy(field)"
++              />
++              <label [for]="id(field)">{{ field.label }}</label>
++            }
++            @case ('select') {
++              <label [for]="id(field)">{{ field.label }}</label>
++              <select
++                [id]="id(field)"
++                [formControl]="controlFor(field.key)"
++                [attr.required]="field.required ? '' : null"
++                [attr.aria-required]="field.required ? 'true' : null"
++                [attr.aria-invalid]="error ? 'true' : null"
++                [attr.aria-describedby]="describedBy(field)"
++              >
++                <option value="">{{ field.placeholder }}</option>
++                @for (option of field.options; track option.value) {
++                  <option [value]="option.value">{{ option.label }}</option>
++                }
++              </select>
++            }
++            @case ('number') {
++              <label [for]="id(field)">{{ field.label }}</label>
++              <input
++                type="number"
++                inputmode="numeric"
++                [id]="id(field)"
++                [formControl]="controlFor(field.key)"
++                [attr.placeholder]="field.placeholder"
++                [attr.required]="field.required ? '' : null"
++                [attr.aria-required]="field.required ? 'true' : null"
++                [attr.aria-invalid]="error ? 'true' : null"
++                [attr.aria-describedby]="describedBy(field)"
++              />
++            }
++            @default {
++              <label [for]="id(field)">{{ field.label }}</label>
++              <input
++                [id]="id(field)"
++                [type]="field.type"
++                [formControl]="controlFor(field.key)"
++                [attr.placeholder]="field.placeholder"
++                [attr.required]="field.required ? '' : null"
++                [attr.aria-required]="field.required ? 'true' : null"
++                [attr.aria-invalid]="error ? 'true' : null"
++                [attr.aria-describedby]="describedBy(field)"
++              />
++            }
++          }
++          @if (field.helpText) {
++            <p class="field__help" [id]="id(field) + '-help'">{{ field.helpText }}</p>
++          }
++          @if (error) {
++            <p class="field__error" [id]="id(field) + '-error'">{{ error }}</p>
++          }
++        </div>
++      }
++      <button type="submit" class="button">{{ text('common.continue', '') }}</button>
++    </form>
++  }
++</section>
+diff --git a/frontend/src/app/features/applicant-form/applicant-form.spec.ts b/frontend/src/app/features/applicant-form/applicant-form.spec.ts
+new file mode 100644
+index 0000000..2ad3d93
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/applicant-form.spec.ts
+@@ -0,0 +1,360 @@
++import { TestBed, ComponentFixture } from '@angular/core/testing';
++import { provideRouter, Router } from '@angular/router';
++import { Observable, NEVER, of, throwError } from 'rxjs';
++import { CLOCK } from '../../core/clock';
++import { CountryContext } from '../../core/country-context';
++import { CountryRaw } from '../../core/country-config';
++import { QuoteStore } from '../../core/quote-store';
++import { StrapiClient } from '../../core/strapi-client';
++import { ApplicantForm } from './applicant-form';
++import { FormFieldRaw } from './form-field-config';
++
++const COPY = [
++  { key: 'form.title', value: 'TITLE' },
++  { key: 'form.intro', value: 'INTRO' },
++  { key: 'form.loading', value: 'LOADING-MSG' },
++  { key: 'form.error', value: 'ERROR-MSG' },
++  { key: 'form.empty', value: 'EMPTY-MSG' },
++  { key: 'form.genericError', value: 'GENERIC-MSG' },
++  { key: 'common.continue', value: 'CONTINUE' },
++  { key: 'common.retry', value: 'RETRY' },
++];
++
++const country = (code: string, over: Partial<CountryRaw> = {}): CountryRaw => ({
++  code,
++  name: code,
++  numberLocale: 'es-XX',
++  currency: 'XXX',
++  legalAge: 18,
++  copy: COPY,
++  ...over,
++});
++
++const raw = (over: Partial<FormFieldRaw> & { key: string }): FormFieldRaw => ({
++  label: `Label ${over.key}`,
++  type: 'text',
++  required: true,
++  order: 1,
++  group: 'policyholder',
++  options: [],
++  validations: [],
++  ...over,
++});
++
++type FieldsResponse = Observable<{ data: FormFieldRaw[] }>;
++
++interface Setup {
++  fixture: ComponentFixture<ApplicantForm>;
++  el: HTMLElement;
++  store: QuoteStore;
++  navigate: ReturnType<typeof vi.spyOn>;
++  get: ReturnType<typeof vi.fn>;
++}
++
++async function setup(
++  code: string,
++  fields: FieldsResponse | FormFieldRaw[],
++  opts: { country?: Partial<CountryRaw>; preload?: Record<string, string | number | boolean | null> } = {},
++): Promise<Setup> {
++  const fieldsStream = Array.isArray(fields) ? of({ data: fields }) : fields;
++  const get = vi.fn((path: string) => {
++    if (path.startsWith('/countries')) {
++      return of({ data: [country(code, opts.country)] });
++    }
++    if (path.startsWith('/form-fields')) {
++      return fieldsStream;
++    }
++    return throwError(() => new Error(`unexpected ${path}`));
++  });
++  TestBed.configureTestingModule({
++    providers: [
++      provideRouter([]),
++      { provide: StrapiClient, useValue: { get } },
++      { provide: CLOCK, useValue: () => new Date(2026, 5, 15) },
++    ],
++  });
++  await TestBed.inject(CountryContext).resolve(code);
++  const store = TestBed.inject(QuoteStore);
++  store.activate(code);
++  if (opts.preload) {
++    store.setApplicant(opts.preload);
++  }
++  const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
++  const fixture = TestBed.createComponent(ApplicantForm);
++  fixture.detectChanges();
++  if (fields !== NEVER) {
++    await fixture.whenStable();
++  }
++  fixture.detectChanges();
++  return { fixture, el: fixture.nativeElement as HTMLElement, store, navigate, get };
++}
++
++const fieldKeys = (el: HTMLElement): string[] =>
++  Array.from(el.querySelectorAll<HTMLElement>('div.field')).map((d) => d.dataset['field']!);
++const input = (el: HTMLElement, key: string): HTMLInputElement =>
++  el.querySelector<HTMLInputElement>(`#field-${key}`)!;
++
++async function type(s: Setup, key: string, value: string): Promise<void> {
++  const control = input(s.el, key);
++  control.value = value;
++  control.dispatchEvent(new Event('input'));
++  s.fixture.detectChanges();
++  await s.fixture.whenStable();
++}
++
++async function submit(s: Setup): Promise<void> {
++  s.el.querySelector<HTMLButtonElement>('button[type=submit]')!.click();
++  s.fixture.detectChanges();
++  await s.fixture.whenStable();
++  s.fixture.detectChanges();
++}
++
++describe('ApplicantForm', () => {
++  beforeEach(() => sessionStorage.clear());
++  afterEach(() => {
++    sessionStorage.clear();
++    vi.restoreAllMocks();
++  });
++
++  it('US-01-AC-01 renders only the country published fields in order', async () => {
++    // The API call is already filtered by country; the component renders what it receives, in order.
++    const co = await setup('CO', [
++      raw({ key: 'documentNumber', order: 2 }),
++      raw({ key: 'documentType', order: 1 }),
++      raw({ key: 'plate', order: 3 }),
++    ]);
++    expect(fieldKeys(co.el)).toEqual(['documentType', 'documentNumber', 'plate']);
++    const fieldsCall = co.get.mock.calls.map((c) => String(c[0])).find((p) => p.startsWith('/form-fields'))!;
++    expect(decodeURIComponent(fieldsCall)).toContain('filters[country][code][$eq]=CO');
++    expect(decodeURIComponent(fieldsCall)).not.toContain('status=');
++  });
++
++  it('US-01-AC-01 renders a different field set and order for CL', async () => {
++    const cl = await setup('CL', [raw({ key: 'firstName', order: 1 }), raw({ key: 'documentNumber', order: 3 }), raw({ key: 'lastName', order: 2 })]);
++    expect(fieldKeys(cl.el)).toEqual(['firstName', 'lastName', 'documentNumber']);
++    const fieldsCall = cl.get.mock.calls.map((c) => String(c[0])).find((p) => p.startsWith('/form-fields'))!;
++    expect(decodeURIComponent(fieldsCall)).toContain('filters[country][code][$eq]=CL');
++  });
++
++  it('US-01-AC-02 shows configured error message and blocks continue', async () => {
++    const s = await setup('CO', [
++      raw({
++        key: 'firstName',
++        validations: [{ type: 'minLength', value: '3', message: 'RULE-MSG' }],
++      }),
++    ]);
++    await type(s, 'firstName', 'ab');
++    await submit(s);
++    expect(s.el.querySelector('#field-firstName-error')?.textContent?.trim()).toBe('RULE-MSG');
++    expect(s.navigate).not.toHaveBeenCalled();
++    expect(s.store.values()).toEqual({});
++  });
++
++  it('US-01-AC-02 error appears after blur, not while typing', async () => {
++    const s = await setup('CO', [raw({ key: 'firstName', errorMessage: 'FIELD-MSG' })]);
++    expect(s.el.querySelector('#field-firstName-error')).toBeNull();
++    input(s.el, 'firstName').dispatchEvent(new Event('blur'));
++    s.fixture.detectChanges();
++    expect(s.el.querySelector('#field-firstName-error')?.textContent?.trim()).toBe('FIELD-MSG');
++  });
++
++  it('US-01-AC-02 valid submit saves normalized values and navigates to planes', async () => {
++    const s = await setup('CL', [
++      raw({ key: 'firstName', order: 1 }),
++      raw({ key: 'documentNumber', order: 2, validations: [{ type: 'rut', value: null }] }),
++    ]);
++    await type(s, 'firstName', '  Ana  ');
++    await type(s, 'documentNumber', '11.111.111-1');
++    await submit(s);
++    expect(s.navigate).toHaveBeenCalledWith(['/', 'cl', 'planes']);
++    expect(s.store.values()).toEqual({ firstName: 'Ana', documentNumber: '11111111-1' });
++  });
++
++  it('US-01-AC-03 renders a newly published field without code changes', async () => {
++    const before = await setup('CO', [raw({ key: 'firstName' })]);
++    expect(fieldKeys(before.el)).toEqual(['firstName']);
++    TestBed.resetTestingModule();
++    const after = await setup('CO', [raw({ key: 'firstName', order: 1 }), raw({ key: 'brandNewField', order: 2, label: 'Brand new' })]);
++    expect(fieldKeys(after.el)).toEqual(['firstName', 'brandNewField']);
++    expect(after.el.querySelector('label[for="field-brandNewField"]')?.textContent).toBe('Brand new');
++  });
++
++  it('US-01-AC-06 renders select options from Strapi in order', async () => {
++    const s = await setup('CO', [
++      raw({
++        key: 'city',
++        type: 'select',
++        placeholder: 'Pick',
++        options: [
++          { value: 'c', label: 'Third', order: 3 },
++          { value: 'a', label: 'First', order: 1 },
++          { value: 'b', label: 'Second', order: 2 },
++        ],
++      }),
++    ]);
++    const options = Array.from(s.el.querySelectorAll<HTMLOptionElement>('#field-city option'));
++    const real = options.filter((o) => o.value !== '');
++    expect(real.map((o) => o.value)).toEqual(['a', 'b', 'c']);
++    expect(real.map((o) => o.textContent?.trim())).toEqual(['First', 'Second', 'Third']);
++    expect(options.length).toBe(real.length + 1); // one empty placeholder option, nothing else
++  });
++
++  it('US-01-AC-11 focuses first invalid field on continue', async () => {
++    const s = await setup('CO', [
++      raw({ key: 'aaa', order: 1 }),
++      raw({ key: 'bbb', order: 2, errorMessage: 'BBB-MSG' }),
++      raw({ key: 'ccc', order: 3 }),
++    ]);
++    document.body.appendChild(s.el); // focus requires attachment to the document
++    await type(s, 'aaa', 'ok');
++    await submit(s);
++    expect(document.activeElement).toBe(input(s.el, 'bbb'));
++    for (const key of ['bbb', 'ccc']) {
++      const control = input(s.el, key);
++      expect(control.getAttribute('aria-invalid')).toBe('true');
++      expect(control.getAttribute('aria-describedby')).toContain(`field-${key}-error`);
++      expect(s.el.querySelector(`#field-${key}-error`)).not.toBeNull();
++    }
++    expect(input(s.el, 'aaa').getAttribute('aria-invalid')).toBeNull();
++    s.el.remove();
++  });
++
++  it('US-01-AC-11 labels, help text and required state are exposed accessibly', async () => {
++    const s = await setup('CO', [raw({ key: 'aaa', helpText: 'HELP' })]);
++    expect(s.el.querySelector('label[for="field-aaa"]')?.textContent).toBe('Label aaa');
++    expect(input(s.el, 'aaa').getAttribute('aria-describedby')).toContain('field-aaa-help');
++    expect(s.el.querySelector('#field-aaa-help')?.textContent).toBe('HELP');
++    expect(input(s.el, 'aaa').getAttribute('aria-required')).toBe('true');
++  });
++
++  it('US-01-AC-13 isolates wizard state per country', async () => {
++    const co = await setup('CO', [raw({ key: 'firstName' })]);
++    await type(co, 'firstName', 'Ana');
++    await submit(co);
++    expect(sessionStorage.getItem('quote:v1:CO')).toContain('Ana');
++    TestBed.resetTestingModule();
++    // Fresh app session in the same tab: CL must start empty, CO data must remain stored.
++    const cl = await setup('CL', [raw({ key: 'firstName' })]);
++    expect(input(cl.el, 'firstName').value).toBe('');
++    expect(cl.store.values()).toEqual({});
++    expect(sessionStorage.getItem('quote:v1:CO')).toContain('Ana');
++  });
++
++  it('US-01-AC-13 switching country within one session does not leak values', async () => {
++    const s = await setup('CO', [raw({ key: 'firstName' })], { preload: { firstName: 'Ana' } });
++    s.store.activate('CL');
++    expect(s.store.values()).toEqual({});
++    s.store.activate('CO');
++    expect(s.store.values()).toEqual({ firstName: 'Ana' });
++  });
++
++  it('US-01-AC-04 restores stored values when the form is reopened (unit part)', async () => {
++    const s = await setup('CO', [raw({ key: 'firstName' }), raw({ key: 'accept', type: 'checkbox', order: 2 })], {
++      preload: { firstName: 'Ana', accept: true },
++    });
++    expect(input(s.el, 'firstName').value).toBe('Ana');
++    expect(input(s.el, 'accept').checked).toBe(true);
++  });
++
++  it('US-01-AC-14 renders CMS text as plain text', async () => {
++    const html = '<img src=x onerror=alert(1)><b>bold</b>';
++    const s = await setup('CO', [raw({ key: 'firstName', label: html, helpText: html, errorMessage: html })], {
++      country: { copy: COPY.map((c) => (c.key === 'form.title' ? { ...c, value: html } : c)) },
++    });
++    await submit(s);
++    expect(s.el.querySelector('img')).toBeNull();
++    expect(s.el.querySelector('b')).toBeNull();
++    expect(s.el.querySelector('label[for="field-firstName"]')?.textContent).toBe(html);
++    expect(s.el.querySelector('#field-firstName-help')?.textContent).toBe(html);
++    expect(s.el.querySelector('#field-firstName-error')?.textContent?.trim()).toBe(html);
++    expect(s.el.querySelector('h1')?.textContent).toBe(html);
++  });
++
++  it('US-01-AC-16 form still renders when a field has an unknown validator, warning has no value', async () => {
++    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++    const s = await setup('CO', [
++      raw({ key: 'firstName', validations: [{ type: 'mystery', value: 'TOP-SECRET' }] }),
++    ]);
++    expect(fieldKeys(s.el)).toEqual(['firstName']);
++    await type(s, 'firstName', 'Ana');
++    await submit(s);
++    expect(s.navigate).toHaveBeenCalled();
++    expect(warn).toHaveBeenCalled();
++    for (const call of warn.mock.calls) {
++      expect(String(call[0])).not.toContain('TOP-SECRET');
++      expect(String(call[0])).not.toContain('Ana');
++    }
++  });
++
++  it('US-01-AC-19 falls back to country generic error message in the UI', async () => {
++    const s = await setup('CO', [raw({ key: 'firstName' })]);
++    await submit(s);
++    expect(s.el.querySelector('#field-firstName-error')?.textContent?.trim()).toBe('GENERIC-MSG');
++  });
++
++  it('US-01-AC-24 skips misconfigured fields with a warning', async () => {
++    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++    const s = await setup('CO', [
++      raw({ key: 'firstName', order: 1 }),
++      raw({ key: 'extra', type: 'slider', order: 2 }),
++      raw({ key: 'fuelType', type: 'select', order: 3, options: [] }),
++      raw({ key: 'plate', order: 3, label: 'first' }),
++      raw({ key: 'plate', order: 5, label: 'second' }),
++      raw({ key: 'birthDate', type: 'date', order: 6, validations: [{ type: 'minAge', value: null }] }),
++    ], { country: { legalAge: undefined as unknown as number } });
++    expect(fieldKeys(s.el)).toEqual(['firstName', 'plate', 'birthDate']);
++    expect(s.el.querySelector('label[for="field-plate"]')?.textContent).toBe('first');
++    await type(s, 'firstName', 'Ana');
++    await type(s, 'plate', 'ABC123');
++    await type(s, 'birthDate', '1990-01-01');
++    await submit(s);
++    expect(s.navigate).not.toHaveBeenCalled(); // birthDate fails closed
++    expect(s.el.querySelector('#field-birthDate-error')).not.toBeNull();
++    expect(warn).toHaveBeenCalled();
++  });
++
++  it('US-01-AC-17 shows error state and retries', async () => {
++    let calls = 0;
++    const stream = new Observable<{ data: FormFieldRaw[] }>((sub) => {
++      calls++;
++      if (calls === 1) {
++        sub.error(new Error('boom'));
++      } else {
++        sub.next({ data: [raw({ key: 'firstName' })] });
++        sub.complete();
++      }
++    });
++    const s = await setup('CO', stream);
++    expect(s.el.querySelector('[data-testid=form-error]')?.textContent).toContain('ERROR-MSG');
++    expect(s.el.querySelector('button[type=submit]')).toBeNull();
++    const retry = Array.from(s.el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'RETRY')!;
++    retry.click();
++    s.fixture.detectChanges();
++    await s.fixture.whenStable();
++    s.fixture.detectChanges();
++    expect(fieldKeys(s.el)).toEqual(['firstName']);
++    expect(calls).toBe(2);
++  });
++
++  it('US-01-AC-18 shows empty state when no fields', async () => {
++    const s = await setup('CO', []);
++    expect(s.el.querySelector('[data-testid=form-empty]')?.textContent).toContain('EMPTY-MSG');
++    expect(s.el.querySelector('button[type=submit]')).toBeNull();
++  });
++
++  it('US-01-AC-20 discards stored value of removed field', async () => {
++    const s = await setup('CO', [raw({ key: 'firstName' })], { preload: { firstName: 'Ana', removedField: 'OLD' } });
++    expect(fieldKeys(s.el)).toEqual(['firstName']);
++    await submit(s);
++    expect(s.store.values()).toEqual({ firstName: 'Ana' });
++  });
++
++  it('US-01-AC-25 shows loading state while configuration loads', async () => {
++    const s = await setup('CO', NEVER);
++    const loading = s.el.querySelector('[data-testid=form-loading]');
++    expect(loading?.getAttribute('aria-live')).toBe('polite');
++    expect(loading?.textContent).toContain('LOADING-MSG');
++    expect(s.el.querySelector('div.field')).toBeNull();
++    expect(s.el.querySelector('button[type=submit]')).toBeNull();
++  });
++});
+diff --git a/frontend/src/app/features/applicant-form/applicant-form.ts b/frontend/src/app/features/applicant-form/applicant-form.ts
+new file mode 100644
+index 0000000..4c0568b
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/applicant-form.ts
+@@ -0,0 +1,204 @@
++import {
++  ChangeDetectionStrategy,
++  Component,
++  ElementRef,
++  afterNextRender,
++  computed,
++  inject,
++  signal,
++  untracked,
++  viewChild,
++} from '@angular/core';
++import { rxResource, takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
++import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
++import { ActivatedRoute, Router } from '@angular/router';
++import { startWith, switchMap } from 'rxjs';
++import { CLOCK } from '../../core/clock';
++import { CountryContext } from '../../core/country-context';
++import { QuoteStore, QuoteValue } from '../../core/quote-store';
++import { FALLBACK_COPY } from '../../core/site-copy';
++import { ApplicantFormApi } from './applicant-form-api';
++import { FormFieldConfig } from './form-field-config';
++import {
++  FieldValue,
++  RULE_ERROR,
++  ValidationContext,
++  ValidationFailure,
++  buildValidators,
++  normalizeValue,
++  toStoredValue,
++} from './validators';
++
++type FieldControl = FormControl<FieldValue>;
++type ApplicantGroup = FormGroup<Record<string, FieldControl>>;
++
++interface BuiltForm {
++  fields: FormFieldConfig[];
++  group: ApplicantGroup;
++}
++
++/** Step 1: the form is generated at runtime from the Strapi configuration of the current country. */
++@Component({
++  selector: 'app-applicant-form',
++  imports: [ReactiveFormsModule],
++  templateUrl: './applicant-form.html',
++  styleUrl: './applicant-form.css',
++  changeDetection: ChangeDetectionStrategy.OnPush,
++})
++export class ApplicantForm {
++  private readonly api = inject(ApplicantFormApi);
++  private readonly context = inject(CountryContext);
++  private readonly store = inject(QuoteStore);
++  private readonly router = inject(Router);
++  private readonly route = inject(ActivatedRoute);
++  private readonly clock = inject(CLOCK);
++  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
++  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
++
++  protected readonly fallback = FALLBACK_COPY;
++  protected readonly country = this.context.current;
++  protected readonly submitted = signal(false);
++  /** Bumped on every control event so OnPush templates re-read control state. */
++  private readonly revision = signal(0);
++  private headingFocused = false;
++
++  protected readonly fieldsResource = rxResource({
++    params: () => this.country()?.code,
++    stream: ({ params }) => this.api.fields(params),
++  });
++
++  private readonly built = computed<BuiltForm | null>(() => {
++    const country = this.country();
++    if (!country || !this.fieldsResource.hasValue()) {
++      return null;
++    }
++    const fields = this.fieldsResource.value();
++    const ctx: ValidationContext = {
++      legalAge: typeof country.legalAge === 'number' ? country.legalAge : null,
++      now: this.clock,
++      genericError: country.copy['form.genericError'] ?? '',
++    };
++    const stored = untracked(() => this.store.values());
++    const controls: Record<string, FieldControl> = {};
++    for (const field of fields) {
++      controls[field.key] = new FormControl<FieldValue>(initialValue(field, stored[field.key]), {
++        validators: buildValidators(field, ctx),
++      });
++    }
++    return { fields, group: new FormGroup(controls) };
++  });
++
++  protected readonly fields = computed(() => this.built()?.fields ?? []);
++  protected readonly form = computed(() => this.built()?.group ?? null);
++
++  constructor() {
++    toObservable(this.form)
++      .pipe(
++        switchMap((group) => (group ? group.events.pipe(startWith(null)) : [])),
++        takeUntilDestroyed(),
++      )
++      .subscribe(() => this.revision.update((v) => v + 1));
++
++    afterNextRender(() => this.focusHeading());
++  }
++
++  protected text(key: string, fallback: string): string {
++    const value = this.country()?.copy[key];
++    if (value === undefined) {
++      console.warn(`Missing copy key: ${key}`);
++      return fallback;
++    }
++    return value;
++  }
++
++  protected controlFor(key: string): FieldControl {
++    // Only called for keys rendered from this form's own field list.
++    return this.form()!.controls[key];
++  }
++
++  /** The visible error for a field: shown after blur (touched) or after "Continuar". */
++  protected errorFor(key: string): string | null {
++    this.revision();
++    const control = this.form()?.controls[key];
++    if (!control || !control.invalid || !(control.touched || this.submitted())) {
++      return null;
++    }
++    const failure = control.errors?.[RULE_ERROR] as ValidationFailure | undefined;
++    return failure?.message ?? null;
++  }
++
++  protected describedBy(field: FormFieldConfig): string | null {
++    const ids: string[] = [];
++    if (field.helpText) {
++      ids.push(`${this.id(field)}-help`);
++    }
++    if (this.errorFor(field.key)) {
++      ids.push(`${this.id(field)}-error`);
++    }
++    return ids.length > 0 ? ids.join(' ') : null;
++  }
++
++  protected id(field: FormFieldConfig): string {
++    return `field-${field.key}`;
++  }
++
++  protected retry(): void {
++    if (this.country()) {
++      this.fieldsResource.reload();
++      return;
++    }
++    const code = this.route.parent?.snapshot.paramMap.get('country')?.toUpperCase();
++    if (code) {
++      void this.context.resolve(code);
++    }
++  }
++
++  protected submit(): void {
++    const form = this.form();
++    const country = this.country();
++    if (!form || !country) {
++      return;
++    }
++    this.submitted.set(true);
++    form.markAllAsTouched();
++    this.revision.update((v) => v + 1);
++    if (form.invalid) {
++      const firstInvalid = this.fields().find((f) => form.controls[f.key].invalid);
++      if (firstInvalid) {
++        const id = this.id(firstInvalid);
++        Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('[id]')).find((el) => el.id === id)?.focus();
++      }
++      return;
++    }
++    const values: Record<string, QuoteValue> = {};
++    for (const field of this.fields()) {
++      values[field.key] = toStoredValue(field, form.controls[field.key].value);
++    }
++    this.store.setApplicant(values);
++    void this.router.navigate(['/', country.code.toLowerCase(), 'planes']);
++  }
++
++  private focusHeading(): void {
++    const heading = this.heading();
++    if (heading && !this.headingFocused) {
++      this.headingFocused = true;
++      heading.nativeElement.focus();
++    }
++  }
++}
++
++/** Restores a stored value only when it still matches the field's type (GAP-10: removed fields are dropped). */
++function initialValue(field: FormFieldConfig, stored: QuoteValue | undefined): FieldValue {
++  if (stored === undefined) {
++    return emptyValue(field);
++  }
++  const normalized = normalizeValue(field, stored);
++  if (field.type === 'select' && !field.options.some((o) => o.value === normalized)) {
++    return emptyValue(field);
++  }
++  return normalized;
++}
++
++function emptyValue(field: FormFieldConfig): FieldValue {
++  return field.type === 'checkbox' ? false : field.type === 'number' ? null : '';
++}
+diff --git a/frontend/src/app/features/applicant-form/form-field-config.spec.ts b/frontend/src/app/features/applicant-form/form-field-config.spec.ts
+new file mode 100644
+index 0000000..44e7bc3
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/form-field-config.spec.ts
+@@ -0,0 +1,83 @@
++import { FormFieldRaw, toFormFieldConfigs } from './form-field-config';
++
++const raw = (over: Partial<FormFieldRaw> & { key: string }): FormFieldRaw => ({
++  label: over.key,
++  type: 'text',
++  required: false,
++  order: 1,
++  group: 'policyholder',
++  options: [],
++  validations: [],
++  ...over,
++});
++
++describe('toFormFieldConfigs', () => {
++  let warn: ReturnType<typeof vi.spyOn>;
++  beforeEach(() => {
++    warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++  });
++  afterEach(() => warn.mockRestore());
++
++  it('US-01-AC-01 sorts by order and breaks ties by key', () => {
++    const result = toFormFieldConfigs([
++      raw({ key: 'c', order: 2 }),
++      raw({ key: 'b', order: 1 }),
++      raw({ key: 'a', order: 1 }),
++    ]);
++    expect(result.map((f) => f.key)).toEqual(['a', 'b', 'c']);
++  });
++
++  it('US-01-AC-06 sorts select options by order', () => {
++    const [f] = toFormFieldConfigs([
++      raw({
++        key: 's',
++        type: 'select',
++        options: [
++          { value: 'z', label: 'Z', order: 3 },
++          { value: 'x', label: 'X', order: 1 },
++          { value: 'y', label: 'Y', order: 2 },
++        ],
++      }),
++    ]);
++    expect(f.options.map((o) => o.value)).toEqual(['x', 'y', 'z']);
++  });
++
++  it('US-01-AC-16 ignores unknown validator with a warning without the value', () => {
++    const [f] = toFormFieldConfigs([
++      raw({
++        key: 'k',
++        validations: [
++          { type: 'nope', value: 'SECRET-123', message: null },
++          { type: 'minLength', value: '2' },
++        ],
++      }),
++    ]);
++    expect(f.validations.map((r) => r.type)).toEqual(['minLength']);
++    expect(f.validations[0].value).toBe(2);
++    expect(warn).toHaveBeenCalledTimes(1);
++    const msg = String(warn.mock.calls[0][0]);
++    expect(msg).toContain('k');
++    expect(msg).toContain('nope');
++    expect(msg).not.toContain('SECRET-123');
++  });
++
++  it('US-01-AC-16 numeric parameter that does not parse is ignored with a warning', () => {
++    const [f] = toFormFieldConfigs([raw({ key: 'k', validations: [{ type: 'min', value: 'abc' }] })]);
++    expect(f.validations).toEqual([]);
++    expect(warn).toHaveBeenCalled();
++    expect(String(warn.mock.calls[0][0])).not.toContain('abc');
++  });
++
++  it('US-01-AC-24 skips unknown type, select without options and duplicate keys', () => {
++    const result = toFormFieldConfigs([
++      raw({ key: 'firstName', order: 1 }),
++      raw({ key: 'extra', type: 'slider', order: 2 }),
++      raw({ key: 'fuelType', type: 'select', order: 3 }),
++      raw({ key: 'plate', order: 5, label: 'second' }),
++      raw({ key: 'plate', order: 3, label: 'first' }),
++    ]);
++    expect(result.map((f) => f.key)).toEqual(['firstName', 'plate']);
++    expect(result.find((f) => f.key === 'plate')?.label).toBe('first');
++    expect(warn).toHaveBeenCalledTimes(3);
++  });
++});
+diff --git a/frontend/src/app/features/applicant-form/form-field-config.ts b/frontend/src/app/features/applicant-form/form-field-config.ts
+new file mode 100644
+index 0000000..969f446
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/form-field-config.ts
+@@ -0,0 +1,141 @@
++/** Domain model and mapper for Strapi `form-field` entries (SPEC-US-01 section 4). */
++export type FieldType = 'text' | 'number' | 'select' | 'date' | 'checkbox';
++export type FieldGroup = 'policyholder' | 'vehicle';
++
++export interface FieldOption {
++  value: string;
++  label: string;
++  order: number;
++}
++
++export interface ValidationRule {
++  type: string;
++  value: number | string | null;
++  message: string | null;
++}
++
++export interface FormFieldConfig {
++  key: string;
++  label: string;
++  type: FieldType;
++  required: boolean;
++  helpText: string | null;
++  errorMessage: string | null;
++  placeholder: string | null;
++  order: number;
++  group: FieldGroup;
++  maskInSummary: boolean;
++  options: FieldOption[];
++  validations: ValidationRule[];
++}
++
++export interface FormFieldRaw {
++  documentId?: string;
++  key: string;
++  label: string;
++  type: string;
++  required?: boolean | null;
++  helpText?: string | null;
++  errorMessage?: string | null;
++  placeholder?: string | null;
++  order?: number | null;
++  group?: string | null;
++  maskInSummary?: boolean | null;
++  options?: Array<{ value: string; label: string; order?: number | null }> | null;
++  validations?: Array<{ type: string; value?: string | null; message?: string | null }> | null;
++}
++
++const FIELD_TYPES: readonly string[] = ['text', 'number', 'select', 'date', 'checkbox'];
++const NUMERIC_RULES: readonly string[] = ['minLength', 'maxLength', 'min', 'max', 'minAge'];
++/** Validator names implemented in code (SPEC-US-01 section 5). */
++export const KNOWN_VALIDATORS: readonly string[] = [
++  'required',
++  'minLength',
++  'maxLength',
++  'min',
++  'max',
++  'pattern',
++  'minAge',
++  'vehicleYear',
++  'rut',
++  'colombianId',
++];
++
++function blankToNull(value: string | null | undefined): string | null {
++  return value === undefined || value === null || value === '' ? null : value;
++}
++
++function toRules(key: string, raw: FormFieldRaw['validations']): ValidationRule[] {
++  const rules: ValidationRule[] = [];
++  for (const rule of raw ?? []) {
++    if (!KNOWN_VALIDATORS.includes(rule.type)) {
++      console.warn(`Unknown validator ignored: field "${key}", validator "${rule.type}"`);
++      continue;
++    }
++    const message = blankToNull(rule.message);
++    const text = blankToNull(rule.value);
++    if (NUMERIC_RULES.includes(rule.type)) {
++      if (text === null) {
++        rules.push({ type: rule.type, value: null, message });
++        continue;
++      }
++      const parsed = Number(text);
++      if (!Number.isFinite(parsed)) {
++        console.warn(`Validator ignored (parameter is not a number): field "${key}", validator "${rule.type}"`);
++        continue;
++      }
++      rules.push({ type: rule.type, value: parsed, message });
++      continue;
++    }
++    rules.push({ type: rule.type, value: text, message });
++  }
++  return rules;
++}
++
++/** Maps one raw entry. Returns null (with a warning) when the field must not be rendered. */
++function toField(raw: FormFieldRaw): FormFieldConfig | null {
++  if (!FIELD_TYPES.includes(raw.type)) {
++    console.warn(`Field skipped (unknown type): field "${raw.key}"`);
++    return null;
++  }
++  const options = (raw.options ?? [])
++    .map((o) => ({ value: String(o.value), label: o.label, order: o.order ?? Number.MAX_SAFE_INTEGER }))
++    .sort((a, b) => a.order - b.order);
++  if (raw.type === 'select' && options.length === 0) {
++    console.warn(`Field skipped (select without options): field "${raw.key}"`);
++    return null;
++  }
++  return {
++    key: raw.key,
++    label: raw.label,
++    type: raw.type as FieldType,
++    required: raw.required === true,
++    helpText: blankToNull(raw.helpText),
++    errorMessage: blankToNull(raw.errorMessage),
++    placeholder: blankToNull(raw.placeholder),
++    order: raw.order ?? 0,
++    group: raw.group === 'vehicle' ? 'vehicle' : 'policyholder',
++    maskInSummary: raw.maskInSummary === true,
++    options,
++    validations: toRules(raw.key, raw.validations),
++  };
++}
++
++/** The only place that knows the raw Strapi form-field shape. Sorted by `order`, ties by `key`. */
++export function toFormFieldConfigs(raws: readonly FormFieldRaw[]): FormFieldConfig[] {
++  const sorted = [...raws].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.key.localeCompare(b.key));
++  const seen = new Set<string>();
++  const result: FormFieldConfig[] = [];
++  for (const raw of sorted) {
++    if (seen.has(raw.key)) {
++      console.warn(`Field skipped (duplicate key): field "${raw.key}"`);
++      continue;
++    }
++    seen.add(raw.key);
++    const field = toField(raw);
++    if (field) {
++      result.push(field);
++    }
++  }
++  return result;
++}
+diff --git a/frontend/src/app/features/applicant-form/validators.spec.ts b/frontend/src/app/features/applicant-form/validators.spec.ts
+new file mode 100644
+index 0000000..2f2c17b
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/validators.spec.ts
+@@ -0,0 +1,187 @@
++import { FormFieldConfig, ValidationRule } from './form-field-config';
++import { ValidationContext, compileField, isStep1Valid } from './validators';
++
++// Fixed clock: 2026-06-15 (local date).
++const TODAY = new Date(2026, 5, 15);
++const ctx = (over: Partial<ValidationContext> = {}): ValidationContext => ({
++  legalAge: 18,
++  now: () => TODAY,
++  genericError: 'GENERIC',
++  ...over,
++});
++
++function field(over: Partial<FormFieldConfig>): FormFieldConfig {
++  return {
++    key: 'f',
++    label: 'F',
++    type: 'text',
++    required: false,
++    helpText: null,
++    errorMessage: null,
++    placeholder: null,
++    order: 1,
++    group: 'policyholder',
++    maskInSummary: false,
++    options: [],
++    validations: [],
++    ...over,
++  };
++}
++const rule = (type: string, value: number | string | null = null, message: string | null = null): ValidationRule => ({
++  type,
++  value,
++  message,
++});
++const isValid = (f: FormFieldConfig, raw: unknown, c = ctx()): boolean => compileField(f, c)(raw) === null;
++
++describe('validators', () => {
++  it('US-01-AC-02 shows configured error message and blocks continue', () => {
++    const f = field({
++      required: true,
++      errorMessage: 'FIELD-MSG',
++      validations: [rule('minLength', 3, 'RULE-MSG')],
++    });
++    const validate = compileField(f, ctx());
++    expect(validate('ab')).toEqual({ rule: 'minLength', message: 'RULE-MSG' });
++    expect(validate('')).toEqual({ rule: 'required', message: 'FIELD-MSG' });
++    expect(validate('abc')).toBeNull();
++  });
++
++  it('US-01-AC-02 required rule message overrides the field message for empty values', () => {
++    const f = field({ errorMessage: 'FIELD-MSG', validations: [rule('required', null, 'REQ-MSG')] });
++    expect(compileField(f, ctx())('  ')).toEqual({ rule: 'required', message: 'REQ-MSG' });
++  });
++
++  it('US-01-AC-02 checkbox must be checked when required', () => {
++    const f = field({ type: 'checkbox', required: true, errorMessage: 'CHK' });
++    expect(compileField(f, ctx())(false)?.message).toBe('CHK');
++    expect(isValid(f, true)).toBe(true);
++  });
++
++  it('US-01-AC-02 min, max, minLength, maxLength and pattern boundaries', () => {
++    expect(isValid(field({ type: 'number', validations: [rule('min', 0), rule('max', 500000)] }), 0)).toBe(true);
++    expect(isValid(field({ type: 'number', validations: [rule('min', 0)] }), -1)).toBe(false);
++    expect(isValid(field({ type: 'number', validations: [rule('max', 500000)] }), 500001)).toBe(false);
++    expect(isValid(field({ validations: [rule('maxLength', 3)] }), ' abc ')).toBe(true);
++    expect(isValid(field({ validations: [rule('maxLength', 3)] }), 'abcd')).toBe(false);
++    const pat = field({ validations: [rule('pattern', '[A-Za-z]{3}\\d{3}')] });
++    expect(isValid(pat, 'ABC123')).toBe(true);
++    expect(isValid(pat, 'ABC1234')).toBe(false);
++    expect(isValid(pat, 'xABC123')).toBe(false);
++  });
++
++  it('US-01-AC-02 optional empty field is valid and skips other rules', () => {
++    expect(isValid(field({ validations: [rule('minLength', 5)] }), '')).toBe(true);
++  });
++
++  describe('US-01-AC-07 validates legal age at todays date', () => {
++    const f = field({ type: 'date', validations: [rule('minAge')] });
++    it('US-01-AC-07 17 (turns 18 tomorrow) is invalid', () => {
++      expect(isValid(f, '2008-06-16')).toBe(false);
++    });
++    it('US-01-AC-07 18 (turns 18 today) is valid', () => {
++      expect(isValid(f, '2008-06-15')).toBe(true);
++    });
++    it('US-01-AC-07 explicit parameter overrides legalAge', () => {
++      expect(isValid(field({ type: 'date', validations: [rule('minAge', 21)] }), '2008-06-15')).toBe(false);
++    });
++    it('US-01-AC-07 Feb 29 birthday completes the year on Mar 1 in non-leap years', () => {
++      expect(isValid(f, '2008-02-29', ctx({ now: () => new Date(2026, 2, 1) }))).toBe(true);
++      expect(isValid(f, '2008-02-29', ctx({ now: () => new Date(2026, 1, 28) }))).toBe(false);
++    });
++    it('US-01-AC-07 impossible date is invalid', () => {
++      expect(isValid(f, '2008-02-31')).toBe(false);
++    });
++    it('US-01-AC-24 minAge fails closed without parameter and without legalAge, and warns', () => {
++      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++      expect(isValid(f, '1990-01-01', ctx({ legalAge: null }))).toBe(false);
++      expect(warn).toHaveBeenCalled();
++      warn.mockRestore();
++    });
++  });
++
++  describe('US-01-AC-08 validates vehicle year limits', () => {
++    const f = field({ type: 'number', validations: [rule('vehicleYear')] });
++    const year = TODAY.getFullYear();
++    it.each([
++      [year + 2, false],
++      [year + 1, true],
++      [year - 20, true],
++      [year - 21, false],
++    ])('US-01-AC-08 year %i -> %s', (y, expected) => {
++      expect(isValid(f, y)).toBe(expected);
++    });
++    it('US-01-AC-08 non-integer year is invalid', () => {
++      expect(isValid(f, year + 0.5)).toBe(false);
++    });
++    it('US-01-AC-08 limits follow the clock, not constants', () => {
++      const later = ctx({ now: () => new Date(2030, 0, 1) });
++      expect(isValid(f, 2031, later)).toBe(true);
++      expect(isValid(f, 2009, later)).toBe(false);
++    });
++  });
++
++  describe('US-01-AC-09 validates Chilean RUT', () => {
++    const f = field({ validations: [rule('rut')] });
++    it.each([
++      ['11.111.111-1', true],
++      ['11111111-1', true],
++      ['111111111', true],
++      ['11.111.111-2', false],
++      ['11.111.111', false],
++      ['abc', false],
++    ])('US-01-AC-09 "%s" -> %s', (rut, expected) => {
++      expect(isValid(f, rut)).toBe(expected);
++    });
++    it('US-01-AC-09 accepts check digit K case-insensitively', () => {
++      // Search fictitious bodies whose modulo-11 digit is K; assert lower and upper case agree.
++      let found = 0;
++      for (let n = 10000000; n < 10000200; n++) {
++        if (isValid(f, `${n}-K`)) {
++          found++;
++          expect(isValid(f, `${n}-k`)).toBe(true);
++        }
++      }
++      expect(found).toBeGreaterThan(0);
++    });
++  });
++
++  describe('US-01-AC-10 validates Colombian document number', () => {
++    const f = field({ validations: [rule('colombianId')] });
++    it.each([
++      ['1111111111', true],
++      ['111111', true],
++      ['11111', false],
++      ['11111111111', false],
++      ['11111A1111', false],
++    ])('US-01-AC-10 "%s" -> %s', (n, expected) => {
++      expect(isValid(f, n)).toBe(expected);
++    });
++  });
++
++  it('US-01-AC-16 ignores unknown validator with a warning (engine level)', () => {
++    const f = field({ validations: [rule('doesNotExist', 'secret-value')] });
++    expect(isValid(f, 'anything')).toBe(true);
++  });
++
++  describe('US-01-AC-19 falls back to country generic error message', () => {
++    it('US-01-AC-19 no rule message and no errorMessage -> generic', () => {
++      const f = field({ validations: [rule('minLength', 5)] });
++      expect(compileField(f, ctx())('abc')).toEqual({ rule: 'minLength', message: 'GENERIC' });
++    });
++    it('US-01-AC-19 required failure with no messages -> generic', () => {
++      expect(compileField(field({ required: true }), ctx())('')?.message).toBe('GENERIC');
++    });
++    it('US-01-AC-19 errorMessage beats generic', () => {
++      const f = field({ errorMessage: 'MINE', validations: [rule('minLength', 5)] });
++      expect(compileField(f, ctx())('abc')?.message).toBe('MINE');
++    });
++  });
++
++  it('US-01-extra isStep1Valid checks stored values against current fields', () => {
++    const fields = [field({ key: 'a', required: true }), field({ key: 'b' })];
++    expect(isStep1Valid(fields, { a: 'x' }, ctx())).toBe(true);
++    expect(isStep1Valid(fields, {}, ctx())).toBe(false);
++    expect(isStep1Valid([], {}, ctx())).toBe(false);
++  });
++});
+diff --git a/frontend/src/app/features/applicant-form/validators.ts b/frontend/src/app/features/applicant-form/validators.ts
+new file mode 100644
+index 0000000..99a0e88
+--- /dev/null
++++ b/frontend/src/app/features/applicant-form/validators.ts
+@@ -0,0 +1,209 @@
++import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
++import { FormFieldConfig, ValidationRule } from './form-field-config';
++
++export type FieldValue = string | number | boolean | null;
++
++export interface ValidationContext {
++  /** Country legal age; null when not configured. */
++  legalAge: number | null;
++  /** Injectable "today" (browser local date). */
++  now: () => Date;
++  /** Country generic error message (`form.genericError`), last step of the message chain. */
++  genericError: string;
++}
++
++export interface ValidationFailure {
++  rule: string;
++  message: string;
++}
++
++/** Error key under which the Angular validator reports a failure. */
++export const RULE_ERROR = 'rule';
++
++/** Normalizes a raw control/storage value by field type (SPEC-US-01 GAP-21). */
++export function normalizeValue(field: FormFieldConfig, raw: unknown): FieldValue {
++  switch (field.type) {
++    case 'number': {
++      if (raw === null || raw === undefined || raw === '') {
++        return null;
++      }
++      const n = typeof raw === 'number' ? raw : Number(raw);
++      return Number.isFinite(n) ? n : null;
++    }
++    case 'checkbox':
++      return raw === true;
++    case 'date':
++    case 'select':
++    case 'text':
++      return raw === null || raw === undefined ? '' : String(raw).trim();
++  }
++}
++
++function isEmpty(field: FormFieldConfig, value: FieldValue): boolean {
++  return field.type === 'checkbox' ? value !== true : value === null || value === '';
++}
++
++const RUT_PATTERN = /^(\d{6,8})-?([\dK])$/;
++
++/** Canonical RUT `body-DV` (no dots, uppercase K), or null when malformed or the check digit is wrong. */
++export function normalizeRut(input: string): string | null {
++  const match = RUT_PATTERN.exec(input.replace(/[.\s]/g, '').toUpperCase());
++  if (!match) {
++    return null;
++  }
++  const [, body, dv] = match;
++  let sum = 0;
++  let factor = 2;
++  for (let i = body.length - 1; i >= 0; i--) {
++    sum += Number(body[i]) * factor;
++    factor = factor === 7 ? 2 : factor + 1;
++  }
++  const remainder = 11 - (sum % 11);
++  const expected = remainder === 11 ? '0' : remainder === 10 ? 'K' : String(remainder);
++  return expected === dv ? `${body}-${dv}` : null;
++}
++
++export function isValidColombianId(input: string): boolean {
++  return /^\d{6,10}$/.test(input.trim());
++}
++
++/** Age in completed years at `today`. A Feb 29 birthday completes the year on Mar 1 in non-leap years. */
++export function ageInYears(isoDate: string, today: Date): number | null {
++  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
++  if (!match) {
++    return null;
++  }
++  const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
++  const check = new Date(y, m - 1, d);
++  if (check.getFullYear() !== y || check.getMonth() !== m - 1 || check.getDate() !== d) {
++    return null;
++  }
++  let age = today.getFullYear() - y;
++  const month = today.getMonth() + 1;
++  if (month < m || (month === m && today.getDate() < d)) {
++    age--;
++  }
++  return age;
++}
++
++export function isValidVehicleYear(year: number, today: Date): boolean {
++  const current = today.getFullYear();
++  return Number.isInteger(year) && year >= current - 20 && year <= current + 1;
++}
++
++type Check = (value: FieldValue) => boolean;
++
++/** Builds the check for one rule on a non-empty value, or null when the rule is ignored (with a warning). */
++function compileRule(field: FormFieldConfig, rule: ValidationRule, ctx: ValidationContext): Check | null {
++  const str = (v: FieldValue): string => (typeof v === 'string' ? v : v === null ? '' : String(v));
++  const num = rule.value;
++  switch (rule.type) {
++    case 'minLength':
++      return typeof num === 'number' ? (v) => str(v).length >= num : null;
++    case 'maxLength':
++      return typeof num === 'number' ? (v) => str(v).length <= num : null;
++    case 'min':
++      return typeof num === 'number' ? (v) => typeof v === 'number' && v >= num : null;
++    case 'max':
++      return typeof num === 'number' ? (v) => typeof v === 'number' && v <= num : null;
++    case 'pattern': {
++      if (typeof num !== 'string') {
++        return null;
++      }
++      try {
++        const regex = new RegExp(`^(?:${num})$`);
++        return (v) => regex.test(str(v));
++      } catch {
++        console.warn(`Validator ignored (invalid pattern): field "${field.key}", validator "pattern"`);
++        return null;
++      }
++    }
++    case 'minAge': {
++      const minimum = typeof num === 'number' ? num : ctx.legalAge;
++      if (minimum === null || minimum === undefined) {
++        console.warn(`Validator fails closed (no age value and no legal age): field "${field.key}", validator "minAge"`);
++        return () => false;
++      }
++      return (v) => {
++        const age = ageInYears(str(v), ctx.now());
++        return age !== null && age >= minimum;
++      };
++    }
++    case 'vehicleYear':
++      return (v) => typeof v === 'number' && isValidVehicleYear(v, ctx.now());
++    case 'rut':
++      return (v) => normalizeRut(str(v)) !== null;
++    case 'colombianId':
++      return (v) => isValidColombianId(str(v));
++    default:
++      return null;
++  }
++}
++
++/**
++ * Compiles a field's validation into one pure function over a raw value. Message chain:
++ * rule message -> field errorMessage -> country generic message (GAP-06).
++ */
++export function compileField(
++  field: FormFieldConfig,
++  ctx: ValidationContext,
++): (raw: unknown) => ValidationFailure | null {
++  const fallback = field.errorMessage ?? ctx.genericError;
++  const requiredRule = field.validations.find((r) => r.type === 'required');
++  const requiredMessage = requiredRule?.message ?? fallback;
++  const mustHaveValue = field.required || requiredRule !== undefined;
++  const checks: Array<{ type: string; message: string; check: Check }> = [];
++  for (const rule of field.validations) {
++    if (rule.type === 'required') {
++      continue;
++    }
++    const check = compileRule(field, rule, ctx);
++    if (check) {
++      checks.push({ type: rule.type, message: rule.message ?? fallback, check });
++    }
++  }
++  return (raw) => {
++    const value = normalizeValue(field, raw);
++    if (isEmpty(field, value)) {
++      return mustHaveValue ? { rule: 'required', message: requiredMessage } : null;
++    }
++    for (const { type, message, check } of checks) {
++      if (!check(value)) {
++        return { rule: type, message };
++      }
++    }
++    return null;
++  };
++}
++
++/** Angular validators for one field (SPEC-US-01 section 5); the error carries the resolved message. */
++export function buildValidators(field: FormFieldConfig, ctx: ValidationContext): ValidatorFn[] {
++  const validate = compileField(field, ctx);
++  return [
++    (control: AbstractControl): ValidationErrors | null => {
++      const failure = validate(control.value);
++      return failure ? { [RULE_ERROR]: failure } : null;
++    },
++  ];
++}
++
++/** Value to persist for a field: normalized, RUT in canonical form. */
++export function toStoredValue(field: FormFieldConfig, raw: unknown): FieldValue {
++  const value = normalizeValue(field, raw);
++  if (typeof value === 'string' && value !== '' && field.validations.some((r) => r.type === 'rut')) {
++    return normalizeRut(value) ?? value;
++  }
++  return value;
++}
++
++/**
++ * "Step 1 valid" (GAP-17): stored values checked against the currently published fields with the
++ * same engine as the form. Shared by the guards of US-02 and US-03.
++ */
++export function isStep1Valid(
++  fields: readonly FormFieldConfig[],
++  values: Readonly<Record<string, FieldValue>>,
++  ctx: ValidationContext,
++): boolean {
++  return fields.length > 0 && fields.every((f) => compileField(f, ctx)(values[f.key] ?? null) === null);
++}
