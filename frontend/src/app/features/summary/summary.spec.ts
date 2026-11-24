@@ -193,6 +193,7 @@ describe('US-03 summary (unit)', () => {
     button(el, 'PAY').click();
     fixture.detectChanges();
     expect(el.querySelector('[data-testid="gateway"]')).not.toBeNull();
+    box.focus(); // a synthetic click does not move focus; a real user click does
     box.click();
     fixture.detectChanges();
     await fixture.whenStable();
@@ -201,8 +202,7 @@ describe('US-03 summary (unit)', () => {
     expect(el.querySelector('[data-testid="gateway"]')).toBeNull();
     expect(button(el, 'APPROVE')).toBeUndefined();
     expect(button(el, 'PAY').disabled).toBe(true);
-    // BUG: TW-BUG-02 Pagar is disabled when unchecked, so focus() on it is a no-op and focus falls to body
-    expect(document.activeElement).toBe(button(el, 'PAY'));
+    expect(document.activeElement).toBe(box);
     expect(set).not.toHaveBeenCalled();
   });
 

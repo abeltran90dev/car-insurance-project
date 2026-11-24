@@ -156,8 +156,8 @@ export class Summary {
     const checked = (event.target as HTMLInputElement).checked;
     this.accepted.set(checked);
     if (!checked && this.state() === 'gateway') {
+      // Pagar is disabled now; focus stays on the terms checkbox the user just operated.
       this.state.set('idle');
-      this.focusLater(this.payButton);
     }
   }
 
