@@ -3420,3 +3420,78 @@
 ● No references to the planning-chat file remain (apart from the original phase
   prompt, which I left as is). Waiting for the spec-writer's SPEC-US-01 note
   before committing and merging.
+
+● Agent "SPEC-US-01 changelog note only" failed: Agent terminated early due to
+  an API error: You've hit your 5-hour limit · resets 10:50pm (America/Bogota)
+  (error type rate_limit, HTTP 429, request id req_011ChM4A3HfKtJAWiAPJEdD7,
+  model sent to the API: claude-opus-5-5)
+  ⎿  You've hit your 5-hour limit · resets 10:50pm (America/Bogota)
+
+> <ide_opened_file>The user opened the file c:\Proyectos\car-insurance-project\
+  docs\ai-sessions\2026-11-23-final-delivery.txt in the IDE. This may or may
+  not be related to the current task.</ide_opened_file>
+
+> Exported to docs/ai-sessions/2026-11-23-final-delivery.txt. Scan it, commit
+  as "docs(sessions): add final-delivery session log" and push.
+
+● The spec-writer stopped on a rate limit. Checking what it left, then scanning
+  the export.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The spec-writer finished the note before it hit the limit. Only the note was
+  added; front matter, version and status are unchanged. Now scanning the
+  export:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● No email addresses and no trace of the local part. Reviewing the 28 keyword
+  hits by hand:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● All 28 hits are prose (descriptions of the security model and the scan
+  itself), so it's clean. Committing the planning-chat changes and the session
+  log, then merging and tagging as you approved:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Bash(git checkout -q main && git pull -q --ff-only && git merge --no-ff -q
+      chore/final-delivery -m "merge(final): final delivery — docs, audit,
+      logs…)
+  ⎿  Updated README.md +185 -185
+  ⎿  Updated docs\ai-sessions\README.md +47 -47
+  ⎿  Updated docs\reviews\AUDIT-DELIVERY.md +129 -129
+  ⎿  Updated docs\reviews\REVIEW-US-03.md +114 -114
+  ⎿  … +6 files changed
+     FLOW.md
+     docs\ai-sessions\2026-11-23-US-01.txt
+     docs\ai-sessions\2026-11-23-US-02.txt
+     +3 more
+  ⎿  (a git step in this command can move the working tree, so these may be
+     its changes, not edits) (ctrl+o to expand)
+
+● The project is delivered: chore/final-delivery is merged into main (05b5a0a),
+  tagged v1.0.0, and both are pushed to origin.
+
+  - Your changes before the merge (0f1fdd1): FLOW.md, README.md and
+    docs/ai-sessions/README.md now use your wording about the planning chat.
+    They say its log is not included and is available on request, and the
+    placeholder entry is gone. The FLOW.md row for the planning chat now says
+    you made every final decision, sometimes against its proposals, and checked
+    results by hand at HC4. The delivery audit records the decision too.
+  - SPEC-US-01 note: the spec-writer added it below the Changelog. Front matter,
+    version and status are unchanged, so there's no new HC1. The agent hit your
+    usage limit right afterwards, but it had already written the note, and I
+    checked the diff.
+  - ADR-005: it still says the planning-chat log is in docs/ai-sessions/. Per
+    your rule that Accepted ADRs don't change, the sessions README now says that
+    statement is superseded by your decision.
+  - Final-delivery log scan: there are no email addresses and no trace of your
+    email's local part. The 28 hits for words like "token" and "secret" are all
+    prose. It's committed as docs(sessions): add final-delivery session log
+    (a249d3d).
+
+  The exported log stops before the merge and tag steps. If you want those in
+  the repo, run /export again and I'll commit it as a follow-up. Otherwise
+  nothing is left to do.
