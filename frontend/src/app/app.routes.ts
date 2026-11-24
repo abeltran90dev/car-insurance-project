@@ -1,7 +1,8 @@
 import { Routes } from '@angular/router';
 import { countryMatchGuard } from './core/country-match-guard';
 import { plansGuard } from './features/plan-list/plans-guard';
-import { STEPS } from './shared/steps';
+import { confirmationGuard } from './features/confirmation/confirmation-guard';
+import { summaryGuard } from './features/summary/summary-guard';
 
 /** ADR-002 routes. Step components are placeholders until the features replace them. */
 export const routes: Routes = [
@@ -26,11 +27,18 @@ export const routes: Routes = [
         runGuardsAndResolvers: 'always',
         loadComponent: () => import('./features/plan-list/plan-list').then((m) => m.PlanList),
       },
-      ...STEPS.filter((step) => step !== 'datos' && step !== 'planes').map((step) => ({
-        path: step,
-        data: { step },
-        loadComponent: () => import('./shared/step-placeholder').then((m) => m.StepPlaceholder),
-      })),
+      {
+        path: 'resumen',
+        canActivate: [summaryGuard],
+        runGuardsAndResolvers: 'always',
+        loadComponent: () => import('./features/summary/summary').then((m) => m.Summary),
+      },
+      {
+        path: 'confirmacion',
+        canActivate: [confirmationGuard],
+        loadComponent: () =>
+          import('./features/confirmation/confirmation').then((m) => m.Confirmation),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'datos' },
     ],
   },

@@ -1,0 +1,125 @@
+<section class="page summary" [attr.aria-busy]="resource.isLoading()">
+  @if (country()) {
+    <h1 #heading tabindex="-1">{{ text('summary.title', '') }}</h1>
+  }
+
+  <div aria-live="polite" class="summary__status">
+    @if (!country()) {
+      <p data-testid="summary-error">{{ fallback.error }}</p>
+    } @else if (resource.isLoading()) {
+      <p data-testid="summary-loading">{{ text('summary.loading', fallback.loading) }}</p>
+    } @else if (resource.error()) {
+      <p data-testid="summary-error">{{ text('summary.error', fallback.error) }}</p>
+    } @else if (locked()) {
+      <p data-testid="payment-processing">{{ text('payment.processing', '') }}</p>
+    }
+  </div>
+
+  @if (!country()) {
+    <button type="button" class="button" (click)="retry()">{{ fallback.retry }}</button>
+  } @else if (resource.isLoading()) {
+    <!-- status text is in the live region above -->
+  } @else if (resource.error()) {
+    <button type="button" class="button" (click)="retry()">{{ text('common.retry', fallback.retry) }}</button>
+  } @else if (planUnavailable()) {
+    <p data-testid="plan-unavailable" role="alert">{{ text('summary.planUnavailable', '') }}</p>
+    <div class="actions">
+      <button type="button" class="button" (click)="changePlan()">{{ text('summary.changePlan', '') }}</button>
+    </div>
+  } @else if (view(); as v) {
+    <div class="summary__layout">
+      <div class="summary__data">
+        <section aria-labelledby="summary-policyholder" data-testid="summary-policyholder">
+          <h2 id="summary-policyholder">{{ text('summary.policyholderTitle', '') }}</h2>
+          <dl class="summary__list">
+            @for (row of v.policyholder; track row.key) {
+              <div class="summary__row" [attr.data-testid]="'row-' + row.key">
+                <dt>{{ row.label }}</dt>
+                <dd>{{ row.displayValue }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+
+        <section aria-labelledby="summary-vehicle" data-testid="summary-vehicle">
+          <h2 id="summary-vehicle">{{ text('summary.vehicleTitle', '') }}</h2>
+          <dl class="summary__list">
+            @for (row of v.vehicle; track row.key) {
+              <div class="summary__row" [attr.data-testid]="'row-' + row.key">
+                <dt>{{ row.label }}</dt>
+                <dd>{{ row.displayValue }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+      </div>
+
+      <div class="summary__side">
+        <section aria-labelledby="summary-plan" data-testid="summary-plan">
+          <h2 id="summary-plan">{{ text('summary.planTitle', '') }}</h2>
+          <p class="summary__plan-name" data-testid="summary-plan-name">{{ v.plan.name }}</p>
+          <p>
+            <span>{{ text('summary.priceLabel', '') }}</span>
+            <strong data-testid="summary-price">{{ v.formattedPrice }}</strong>
+          </p>
+        </section>
+
+        <div class="actions">
+          <button type="button" class="button button--secondary" [disabled]="locked()" (click)="editData()">
+            {{ text('summary.editData', '') }}
+          </button>
+          <button type="button" class="button button--secondary" [disabled]="locked()" (click)="changePlan()">
+            {{ text('summary.changePlan', '') }}
+          </button>
+        </div>
+
+        @if (termsAvailable()) {
+          <div class="terms" data-testid="terms">
+            <h2 id="terms-title">{{ country()!.termsTitle }}</h2>
+            <div class="terms__body" role="region" aria-labelledby="terms-title" tabindex="0" data-testid="terms-body">{{ country()!.termsBody }}</div>
+          </div>
+        } @else {
+          <p data-testid="terms-unavailable" role="alert">{{ text('summary.termsUnavailable', '') }}</p>
+        }
+
+        <div class="terms__accept">
+          <input
+            id="terms-accept"
+            type="checkbox"
+            [checked]="accepted()"
+            [disabled]="locked() || !termsAvailable()"
+            (change)="setAccepted($event)"
+          />
+          <label for="terms-accept">{{ text('summary.termsAccept', '') }}</label>
+        </div>
+
+        @if (state() === 'rejected') {
+          <p #alert class="summary__alert" role="alert" tabindex="-1" data-testid="payment-rejected">
+            {{ text('payment.rejected', '') }}
+          </p>
+        }
+
+        <button #payButton type="button" class="button" [disabled]="!canPay()" (click)="openGateway()">
+          {{ text('payment.pay', '') }}
+        </button>
+
+        @if (state() === 'gateway' || state() === 'processing') {
+          <section class="gateway" aria-labelledby="gateway-title" data-testid="gateway">
+            <h2 #gatewayHeading id="gateway-title" tabindex="-1">{{ text('payment.gatewayTitle', '') }}</h2>
+            <div class="actions">
+              <button type="button" class="button" [disabled]="locked()" (click)="simulate('approved')">
+                {{ text('payment.simulateApprove', '') }}
+              </button>
+              <button type="button" class="button" [disabled]="locked()" (click)="simulate('rejected')">
+                {{ text('payment.simulateReject', '') }}
+              </button>
+              <button type="button" class="button button--secondary" [disabled]="locked()" (click)="cancel()">
+                {{ text('payment.cancel', '') }}
+              </button>
+            </div>
+          </section>
+        }
+      </div>
+    </div>
+  }
+</section>

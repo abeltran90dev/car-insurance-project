@@ -253,19 +253,22 @@ const buildPlans = (s: PlanSet): SeedPlan[] => {
   ];
 };
 
-const TERMS =
-  '1. Este es un texto de ejemplo.\n2. La cotización es simulada y no constituye una póliza.\n3. No se realiza ningún cobro real.';
+const TERMS_CO =
+  '1. Este es un texto de ejemplo para Colombia.\n2. Supervisión: Superintendencia Financiera de Colombia (texto de ejemplo).\n3. La cotización es simulada y no constituye una póliza.\n4. No se realiza ningún cobro real.';
+
+const TERMS_CL =
+  '1. Este es un texto de ejemplo para Chile.\n2. Supervisión: Comisión para el Mercado Financiero (texto de ejemplo).\n3. La cotización es simulada y no constituye una póliza.\n4. No se realiza ningún cobro real.';
 
 export const COUNTRIES: SeedCountry[] = [
   {
     code: 'CO', name: 'Colombia', numberLocale: 'es-CO', currency: 'COP', legalAge: 18,
-    termsTitle: 'Términos y condiciones – Colombia', termsBody: TERMS,
+    termsTitle: 'Términos y condiciones – Colombia', termsBody: TERMS_CO,
     fields: CO_FIELDS,
     plans: buildPlans({ names: ['Plan Básico', 'Plan Estándar', 'Plan Premium'], prices: [850000, 1250000, 1900000], coverages: ['Responsabilidad civil', 'Pérdida total por daños', 'Hurto'], benefits: ['Grúa 24/7', 'Vehículo de reemplazo'] }),
   },
   {
     code: 'CL', name: 'Chile', numberLocale: 'es-CL', currency: 'CLP', legalAge: 18,
-    termsTitle: 'Términos y condiciones – Chile', termsBody: TERMS,
+    termsTitle: 'Términos y condiciones – Chile', termsBody: TERMS_CL,
     fields: CL_FIELDS,
     plans: buildPlans({ names: ['Plan Esencial', 'Plan Full', 'Plan Full Plus'], prices: [259990, 389990, 549990], coverages: ['Responsabilidad civil', 'Daños propios', 'Robo'], benefits: ['Asistencia en ruta', 'Auto de reemplazo'] }),
   },
