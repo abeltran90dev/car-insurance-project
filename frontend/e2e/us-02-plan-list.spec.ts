@@ -6,6 +6,9 @@ const SEED_PLANS: Record<string, string[]> = {
   cl: ['Plan Esencial', 'Plan Full', 'Plan Full Plus'],
 };
 
+// Recommended plan per country (seed data).
+const RECOMMENDED: Record<string, string> = { co: 'Plan Estándar', cl: 'Plan Full' };
+
 const year = new Date().getFullYear() - 2;
 
 // Fictitious, valid step 1 values per country (keys come from the seeded form configuration).
@@ -68,14 +71,9 @@ test.describe('US-02 plan list (e2e)', () => {
       await expect(page.getByText('Plan Borrador')).toHaveCount(0);
     });
 
-    test(`US-02-AC-02 highlights the recommended plan (${cc})`, async ({ page, request }) => {
+    test(`US-02-AC-02 highlights the recommended plan (${cc})`, async ({ page }) => {
       await seedStep1(page, cc);
-      const api = await (
-        await request.get(
-          `/api/plans?filters[country][code][$eq]=${cc.toUpperCase()}&filters[recommended][$eq]=true&filters[active][$eq]=true`,
-        )
-      ).json();
-      const recommendedName: string = api.data[0].name;
+      const recommendedName = RECOMMENDED[cc]; // seed data, SPEC-US-02 AC-02
       await page.goto(`/${cc}/planes`);
       await expect(cards(page).first()).toBeVisible();
       const badges = page.locator('[data-testid="plan-badge"]');
