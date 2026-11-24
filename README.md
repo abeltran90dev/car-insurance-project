@@ -6,16 +6,45 @@ A single Angular application that quotes car insurance for Colombia and Chile in
 
 Built with an AI-driven, spec-driven flow. See [FLOW.md](FLOW.md) and [CLAUDE.md](CLAUDE.md).
 
-## Quick start
+## How to run
 
-TODO: `docker compose up`, URLs (frontend, Strapi admin), seeded countries, how to switch country.
+Requirements: Docker with Docker Compose v2+. Nothing else is needed for the running app.
+
+```bash
+docker compose up --build
+```
+
+| URL | What |
+|-----|------|
+| http://localhost:4200 | Angular app (country picker at `/`, then `/co` or `/cl`) |
+| http://localhost:1337/admin | Strapi admin |
+
+- **Clean clone works as is.** No `.env` is required: the `cms` container generates its secrets on first start and keeps them in the `cms_data` volume. To override defaults, copy `.env.example` to `.env` (placeholders only).
+- **Seed data** for Colombia (`CO`) and Chile (`CL`) is loaded on start (`SEED_ON_BOOT=true`): countries with copy and terms, form fields (plus one draft field per country), and plans (3 active, 1 inactive, 1 draft per country). All data is fictitious. Seeding is idempotent: restarts create no duplicates.
+- **Public permissions** (read-only `find` on `country`, `form-field`, `plan`, `site-copy`) are granted automatically in Strapi `bootstrap` ([ADR-003](docs/adr/ADR-003-strapi-public-permissions-bootstrap.md)). No API token exists or is needed.
+- **Strapi admin user:** create it by hand on the first visit to http://localhost:1337/admin. No admin credentials are stored in the repo.
+- **Switch country:** pick it on `/`, or open `/co` or `/cl` directly. An unknown code (e.g. `/xx`) shows the not-found page.
+- **Reset everything** (database, uploads, generated secrets): `docker compose down -v`.
+
+### Local development (without Docker for the frontend)
+
+```bash
+docker compose up -d cms          # Strapi on :1337
+cd frontend && npm ci && npm start # ng serve on :4200, proxies /api to :1337 (proxy.conf.json)
+```
+
+### Troubleshooting
+
+- **`failed to execute bake` on Windows** (Docker Compose v5.x): a Buildx bake filesystem-entitlement check fails on drive-letter case. Run `export BUILDX_BAKE_ENTITLEMENTS_FS=0` (Git Bash) or `$env:BUILDX_BAKE_ENTITLEMENTS_FS=0` (PowerShell) before `docker compose up --build`.
+- **Port in use:** stop whatever is on 4200 or 1337, or change the host port in `docker-compose.yml`.
+- **curl and Strapi filters:** use `curl -g` so `[` `]` in query strings are not treated as globs.
 
 ## Repository layout
 
 | Path | Contents |
 |------|----------|
-| `frontend/` | Angular app (TODO) |
-| `cms/` | Strapi 5 project with seed data for CO and CL (TODO) |
+| `frontend/` | Angular 21 app (standalone, signals, Vitest, Playwright in `frontend/e2e/`) |
+| `cms/` | Strapi 5 project: content model, bootstrap permissions and idempotent CO/CL seed |
 | `docs/user-stories/` | Input user stories, verbatim |
 | `docs/specs/` | One spec per story (source of truth) |
 | `docs/adr/` | Architecture decision records (MADR) |
@@ -26,7 +55,13 @@ TODO: `docker compose up`, URLs (frontend, Strapi admin), seeded countries, how 
 
 ## Running tests
 
-TODO: unit (Vitest) and e2e (Playwright) commands.
+With the stack running (`docker compose up`):
+
+| Suite | Command |
+|-------|---------|
+| Strapi public permissions (writes denied, reads OK, drafts hidden from app queries) | `cd cms && npm ci && npm run test:permissions` |
+| Frontend unit (Vitest) | `cd frontend && npm ci && npm test` |
+| Frontend e2e (Playwright) | `cd frontend && npx playwright install chromium && npm run e2e` (`E2E_BASE_URL` defaults to http://localhost:4200) |
 
 ## Multi-country strategy
 
@@ -35,6 +70,12 @@ TODO: summary and link to ADR-001.
 ## Security notes
 
 TODO: Public role permissions and their justification; no tokens in the browser.
+
+## Known risks
+
+| Risk | Impact | Status | Proposed fix |
+|------|--------|--------|--------------|
+| Anonymous `GET /api/<type>?status=draft` returns **draft** entries (verified on Strapi 5.63): any Public `find` permission honors the `status` parameter. The app never sends it, so drafts never reach the UI, but a direct caller can read unpublished content. | Low: unpublished business content (fields, plans), no personal data. | Accepted for now (Andres Beltran, 2026-11-23, Phase 2 checkpoint). Fixed if time remains. | A global Strapi middleware that forces `status=published` on unauthenticated `/api` requests, plus a test in `cms/tests/` proving `?status=draft` returns no drafts. |
 
 ## Requirements not met
 
