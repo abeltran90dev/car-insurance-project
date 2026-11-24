@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { CanMatchFn, Router } from '@angular/router';
+import { resolveAndActivate } from './country-activation';
 import { CountryContext } from './country-context';
 import { QuoteStore } from './quote-store';
 
@@ -22,9 +23,8 @@ export const countryMatchGuard: CanMatchFn = async (_route, segments) => {
     return router.parseUrl(url.replace(FIRST_SEGMENT, `/${lower}`));
   }
   const code = lower.toUpperCase();
-  const outcome = await context.resolve(code);
+  const outcome = await resolveAndActivate(context, store, code);
   if (outcome === 'found') {
-    store.activate(code);
     return true;
   }
   // Strapi unreachable is never reported as "country unknown".

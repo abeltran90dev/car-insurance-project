@@ -14,6 +14,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { startWith, switchMap } from 'rxjs';
 import { CLOCK } from '../../core/clock';
+import { resolveAndActivate } from '../../core/country-activation';
 import { CountryContext } from '../../core/country-context';
 import { QuoteStore, QuoteValue } from '../../core/quote-store';
 import { FALLBACK_COPY } from '../../core/site-copy';
@@ -149,7 +150,15 @@ export class ApplicantForm {
     }
     const code = this.route.parent?.snapshot.paramMap.get('country')?.toUpperCase();
     if (code) {
-      void this.context.resolve(code);
+      void this.resolveAfterError(code);
+    }
+  }
+
+  private async resolveAfterError(code: string): Promise<void> {
+    const outcome = await resolveAndActivate(this.context, this.store, code);
+    if (outcome === 'not-found') {
+      // Re-run canMatch so the route falls through to `**` (not-found page) at the same URL.
+      await this.router.navigateByUrl(this.router.url, { onSameUrlNavigation: 'reload' });
     }
   }
 
