@@ -1,0 +1,59 @@
+.form {
+  display: grid;
+  gap: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.field--checkbox {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  column-gap: 0.75rem;
+}
+
+.field--checkbox input {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0.5rem 0 0;
+}
+
+.field--checkbox .field__help,
+.field--checkbox .field__error {
+  grid-column: 2;
+}
+
+.field label {
+  font-weight: 600;
+}
+
+.field input:not([type='checkbox']),
+.field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border: 1px solid #6b7480;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.field [aria-invalid='true'] {
+  border-color: #b00020;
+}
+
+.field__help {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.field__error {
+  margin: 0;
+  color: #b00020;
+  font-size: 0.875rem;
+  font-weight: 600;
+}

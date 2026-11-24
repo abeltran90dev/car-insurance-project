@@ -14,7 +14,12 @@ export const routes: Routes = [
     canMatch: [countryMatchGuard],
     loadComponent: () => import('./shared/country-shell').then((m) => m.CountryShell),
     children: [
-      ...STEPS.map((step) => ({
+      {
+        path: 'datos',
+        loadComponent: () =>
+          import('./features/applicant-form/applicant-form').then((m) => m.ApplicantForm),
+      },
+      ...STEPS.filter((step) => step !== 'datos').map((step) => ({
         path: step,
         data: { step },
         loadComponent: () => import('./shared/step-placeholder').then((m) => m.StepPlaceholder),
