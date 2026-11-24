@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { countryMatchGuard } from './core/country-match-guard';
+import { plansGuard } from './features/plan-list/plans-guard';
 import { STEPS } from './shared/steps';
 
 /** ADR-002 routes. Step components are placeholders until the features replace them. */
@@ -19,7 +20,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/applicant-form/applicant-form').then((m) => m.ApplicantForm),
       },
-      ...STEPS.filter((step) => step !== 'datos').map((step) => ({
+      {
+        path: 'planes',
+        canActivate: [plansGuard],
+        runGuardsAndResolvers: 'always',
+        loadComponent: () => import('./features/plan-list/plan-list').then((m) => m.PlanList),
+      },
+      ...STEPS.filter((step) => step !== 'datos' && step !== 'planes').map((step) => ({
         path: step,
         data: { step },
         loadComponent: () => import('./shared/step-placeholder').then((m) => m.StepPlaceholder),
