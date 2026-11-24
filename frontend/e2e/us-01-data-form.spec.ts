@@ -34,6 +34,60 @@ test.describe('US-01 step 1 (e2e)', () => {
     await expect(page.locator('#field-year')).toHaveValue(year);
   });
 
+  test('US-01-AC-12 completes step 1 with keyboard only', async ({ page }) => {
+    await page.goto('/co/datos');
+    await expect(page.locator('div.field[data-field="documentNumber"]')).toBeVisible();
+
+    const year = String(new Date().getFullYear() - 2);
+    const activeId = () => page.evaluate(() => document.activeElement?.id ?? '');
+    // Press Tab until the expected control has focus (fails if a field is unreachable or out of order).
+    const focusField = async (key: string) => {
+      for (let i = 0; i < 40; i++) {
+        if ((await activeId()) === `field-${key}`) {
+          return;
+        }
+        await page.keyboard.press('Tab');
+      }
+      throw new Error(`field-${key} not reachable with Tab`);
+    };
+
+    await focusField('documentType');
+    await page.keyboard.press('ArrowDown'); // first real option
+    await focusField('documentNumber');
+    await page.keyboard.type('1111111111');
+    await page.keyboard.press('Tab');
+    await page.keyboard.type('Ana');
+    await page.keyboard.press('Tab');
+    await page.keyboard.type('Prueba');
+    await page.keyboard.press('Tab');
+    expect(await activeId()).toBe('field-birthDate');
+    await page.keyboard.type('01151990'); // mm/dd/yyyy segments (Chromium en-US)
+    await focusField('email'); // the date control has several internal tab stops
+    await page.keyboard.type('ana.prueba@example.test');
+    await page.keyboard.press('Tab');
+    await page.keyboard.type('3001234567');
+    await focusField('city');
+    await page.keyboard.press('ArrowDown');
+    await focusField('acceptDataPolicy');
+    await page.keyboard.press('Space');
+    await focusField('plate');
+    await page.keyboard.type('ABC123');
+    await focusField('brand');
+    await page.keyboard.press('ArrowDown');
+    await focusField('model');
+    await page.keyboard.type('Modelo Uno');
+    await page.keyboard.press('Tab');
+    expect(await activeId()).toBe('field-year');
+    await page.keyboard.type(year);
+    await page.keyboard.press('Tab');
+    await page.keyboard.type('12000');
+
+    await page.keyboard.press('Tab');
+    await expect(page.locator('button[type=submit]')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/co\/planes$/);
+  });
+
   for (const cc of ['co', 'cl']) {
     test(`US-01-AC-05 hides unpublished fields (${cc})`, async ({ page, request }) => {
       // Seed data: one draft field "draftOnlyField" per country.
